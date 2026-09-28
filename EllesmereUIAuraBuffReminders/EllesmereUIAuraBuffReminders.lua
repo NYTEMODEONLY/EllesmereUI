@@ -11,6 +11,11 @@ EllesmereUI._ModuleNS[ADDON_NAME] = select(2, ...)  -- LOD options files read th
 
 local EABR = EllesmereUI.Lite.NewAddon("EllesmereUIAuraBuffReminders")
 
+-- Forever uses its own paladin/consumable detector and keeps the Retail
+-- collectors disabled. The existing icon pools, styling and anchors stay owners.
+EABR.FOREVER = EllesmereUI.IS_FOREVER == true
+EABR.ForeverSupport = EllesmereUI._ModuleNS[ADDON_NAME].ForeverReminders
+EABR.CAMP_BENEFITS = 1229741
 
 local _B = {}  -- beacon state table, populated later
 local Known = function(id) return id and (IsPlayerSpell(id) or IsSpellKnown(id)) end
@@ -83,14 +88,24 @@ local db  -- set in EABR:OnInitialize()
 local texCache = {}
 local function Tex(id)
     local c = texCache[id]; if c then return c end
-    local t = (C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(id)) or GetSpellTexture(id)
+    local t
+    if C_Spell and C_Spell.GetSpellTexture then
+        t = C_Spell.GetSpellTexture(id)
+    elseif GetSpellTexture then
+        t = GetSpellTexture(id)
+    end
     if t then texCache[id] = t end; return t
 end
 
 local spellNameCache = {}
 local function SpellName(id)
     local c = spellNameCache[id]; if c then return c end
-    local n = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(id)) or GetSpellInfo(id)
+    local n
+    if C_Spell and C_Spell.GetSpellName then
+        n = C_Spell.GetSpellName(id)
+    elseif GetSpellInfo then
+        n = GetSpellInfo(id)
+    end
     if n then spellNameCache[id] = n end; return n
 end
 
@@ -104,6 +119,7 @@ local function GetPlayerClass()
 end
 
 local function GetSpecID()
+    if not GetSpecialization then return nil end  -- legacy global, not registered on WoW Forever
     local s = GetSpecialization(); if not s then return nil end
     return GetSpecializationInfo(s)
 end
@@ -121,17 +137,11 @@ local function ResolveFontPath(fontName)
     end
     return "Interface\\AddOns\\EllesmereUI\\media\\fonts\\Expressway.TTF"
 end
-local function GetABROutline()
-    return (EllesmereUI and EllesmereUI.GetFontOutlineFlag and EllesmereUI.GetFontOutlineFlag("auraBuff")) or ""
-end
-local function GetABRUseShadow()
-    return not EllesmereUI or not EllesmereUI.GetFontUseShadow or EllesmereUI.GetFontUseShadow("auraBuff")
-end
 local _cachedOutline
 local function SetABRFont(fs, font, size)
     if not (fs and fs.SetFont) then return end
-    if not _cachedOutline then _cachedOutline = GetABROutline() end
-    if EllesmereUI and EllesmereUI.PrimeFontShadow then EllesmereUI.PrimeFontShadow(fs, _cachedOutline == "" and GetABRUseShadow()) end
+    if not _cachedOutline then _cachedOutline = EllesmereUI.GetFontOutlineFlag("auraBuff") end
+    EllesmereUI.PrimeFontShadow(fs, _cachedOutline == "" and EllesmereUI.GetFontUseShadow("auraBuff"))
     fs:SetFont(font, size, _cachedOutline)
 end
 
@@ -178,9 +188,12 @@ local _cachedIType, _cachedDiffID, _cachedMapID
 local _dungeonPrePull = true
 
 local function CacheInstanceInfo()
-    local _, iType, diffID = GetInstanceInfo()
+    -- The eleventh return flags World Tier scaled content (Lairs, every tier).
+    local _, iType, diffID, _, _, _, _, _, _, _, hasWorldTier = GetInstanceInfo()
     _cachedIType = iType
     _cachedDiffID = tonumber(diffID) or 0
+    EABR._cachedWorldTier = hasWorldTier == true
+    if EABR.FOREVER then return end  -- the map lookup only serves the pre-key threshold window
     local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player") or nil
     if mapID ~= _cachedMapID then
         _dungeonPrePull = true
@@ -212,6 +225,7 @@ local function InRealInstancedContent()
 end
 
 local function InMythicPlusKey()
+    if EABR.FOREVER then return false end  -- no keystones on WoW Forever
     return C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive and C_ChallengeMode.IsChallengeModeActive()
 end
 
@@ -234,13 +248,6 @@ end
 local function InPreKeyDungeon()
     if InMythicPlusKey() then return false end
     return _cachedIType == "party" and _cachedDiffID == 8
-end
-
--- Mythic 0 dungeon or Mythic raid (fixed or flex)
-local function InMythicZeroDungeonOrMythicRaid()
-    if EABR.InMythicZeroDungeon() then return true end
-    if IsInRaid() and IsMythicRaidDiff(_cachedDiffID) then return true end
-    return false
 end
 
 local function InPvPInstance()
@@ -268,6 +275,9 @@ function EABR.CurrentDifficultyCat()
         if d == 14 or d == 3 or d == 4 or d == 5 then return "r_normal" end
         if d == 17 or d == 7 then return "r_lfr" end
         if d == 33 then return "d_timewalking" end
+        -- WoW Forever raids report the legacy 40- and 20-player ids; they feed
+        -- the Forever section's "Raids" bucket. Retail leaves them unmapped.
+        if EABR.FOREVER and (d == 9 or d == 148) then return "r_normal" end
     elseif it == "scenario" then
         if d == 208 then return "s_delve" end
     end
@@ -276,9 +286,13 @@ end
 
 -- Coarse buckets matching the options multi-select: open_world, raid_mythic,
 -- raid_heroic, raid_normal_lfr, dungeon_mythic (Mythic + M+), dungeon_nonmythic
--- (Heroic / Normal / Follower), timewalking, delve. Returns nil for unmapped
--- instanced content (e.g. PvP) so reminders never silently vanish there.
+-- (Heroic / Normal / Follower), timewalking, delve, lair. Returns nil for
+-- unmapped instanced content (e.g. PvP) so reminders never silently vanish there.
 function EABR.CurrentWhereBucket(inInstance)
+    -- Lairs carry the World Tier flag instead of a difficulty id the allowlist
+    -- knows; the instance gate keeps the flag from ever reclassifying the
+    -- open world, whatever else it may be set on.
+    if inInstance and EABR._cachedWorldTier then return "lair" end
     local cat = EABR.CurrentDifficultyCat()
     if cat == "d_mplus" or cat == "d_mythic" then return "dungeon_mythic" end
     if cat == "d_heroic" or cat == "d_normal" or cat == "d_follower" then return "dungeon_nonmythic" end
@@ -417,9 +431,12 @@ if EABR.IsRuntimeNonSecret(20707) then NON_SECRET_SPELL_IDS[20707] = true end
 
 local function SnapshotPlayerAuras()
     wipe(_preCombatAuraCache)
-    for id in pairs(NON_SECRET_SPELL_IDS) do
-        local result = C_UnitAuras.GetPlayerAuraBySpellID(id)
-        _preCombatAuraCache[id] = (result ~= nil)
+    if EABR.FOREVER then return
+    else
+        for id in pairs(NON_SECRET_SPELL_IDS) do
+            local result = C_UnitAuras.GetPlayerAuraBySpellID(id)
+            _preCombatAuraCache[id] = (result ~= nil)
+        end
     end
     -- Also snapshots non-whitelisted auras (e.g. Devotion Aura) going secret when a
     -- partymate combats first. 12.1: index scan hard-errors under restrictions (M+/raid) even OOC; whitelisted lookups still work, extras skipped.
@@ -1384,6 +1401,7 @@ local FOOD_ITEMS = {
     { key="foragers_medley",       itemID=242306, name="Forager's Medley" },
     { key="farstrider_rations",    itemID=242309, name="Farstrider Rations" },
     { key="bloom_skewers",         itemID=242302, name="Bloom Skewers" },
+    { key="feast_of_knowledge",    itemID=275266, name="Feast of Knowledge" },
     -- Hearty Food Items
     { key="hearty_royal_roast",            itemID=242747, name="Hearty Royal Roast" },
     { key="hearty_impossibly_royal_roast",  itemID=268679, name="Hearty Impossibly Royal Roast" },
@@ -1421,6 +1439,7 @@ local FOOD_ITEMS = {
     { key="hearty_foragers_medley",         itemID=242773, name="Hearty Forager's Medley" },
     { key="hearty_farstrider_rations",      itemID=242776, name="Hearty Farstrider Rations" },
     { key="hearty_bloom_skewers",           itemID=242769, name="Hearty Bloom Skewers" },
+    { key="hearty_feast_of_knowledge",      itemID=275269, name="Hearty Feast of Knowledge" },
 }
 
 -- Weapon Enchant dropdown choices (name best itemID lookup at runtime)
@@ -1435,7 +1454,7 @@ local WEAPON_ENCHANT_CHOICES = {
 }
 
 -- Augment Runes (item IDs inlined at usage site in CollectConsumables)
-local RUNE_BUFF_IDS = {1264426, 453250, 1234969, 1242347, 393438, 347901}
+local RUNE_BUFF_IDS = {1295329, 1264426, 453250, 1234969, 1242347, 393438, 347901} -- 1295329 = Tidesworn (12.1)
 
 -- Inky Black Potion
 local INKY_BLACK_ITEM = 124640
@@ -1467,6 +1486,7 @@ end
 
 function EABR.ScanEatingState()
     EABR._eatingIID = nil
+    if EABR.FOREVER then return end  -- no food reminder on WoW Forever, so no eating channel to track
     if EllesmereUI.AuraKit and EllesmereUI.AuraKit.AurasRestricted() then return end
     for i = 1, AURA_SCAN_LIMIT do
         local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
@@ -1629,7 +1649,7 @@ local _itemCountDirty = true
 
 -- Resolved consumable cache: WHICH item to show per bag/equip-derived category, rebuilt only when bags/weapon/
 -- preferred-item settings change (EABR.ResolveConsumables). Hung on EABR, not a local (200-local cap). Caches only
--- SELECTION state (itemID/cat/hasBags/availability); icon is derived at each emit site to stay byte-identical to per-refresh GetItemIcon calls. Defaults nil/false; dirty starts true so the first OOC CollectConsumables fully populates it.
+-- SELECTION state (itemID/cat/hasBags/availability); icon is derived at each emit site to stay byte-identical to per-refresh C_Item.GetItemIconByID calls. Defaults nil/false; dirty starts true so the first OOC CollectConsumables fully populates it.
 EABR._resolved = {
     dirty = true,                   -- rebuild pending
     sig = {},                       -- last preferred-setting signature
@@ -1778,11 +1798,12 @@ function EABR.ResolveConsumables()
     local lufd = db.profile and db.profile.lastUsedFood or nil
     local luwe = db.profile and db.profile.lastUsedWeaponEnchant or nil
 
-    -- Augment Rune: void preferred over ethereal; fall back to the current
-    -- rune so an out-of-stock restock reminder can still render.
+    -- Augment Rune: void, then ethereal, then Tidesworn (12.1); fall back to the
+    -- void rune so an out-of-stock restock reminder can still render.
     local runeItem = nil
     if CachedGetItemCount(259085) > 0 then runeItem = 259085
-    elseif CachedGetItemCount(243191) > 0 then runeItem = 243191 end
+    elseif CachedGetItemCount(243191) > 0 then runeItem = 243191
+    elseif CachedGetItemCount(274797) > 0 then runeItem = 274797 end
     R.rune.hasBags = (runeItem ~= nil)
     R.rune.itemID = runeItem or 259085
 
@@ -1982,6 +2003,7 @@ local defaults = {
             countXOffset = 0,
             countYOffset = 0,
             iconSpacing = 14,
+            growDirection = "CENTER",
             opacity = 1.0,
             frameStrata = "MEDIUM",
             cursorAttach = false,
@@ -2067,6 +2089,15 @@ local defaults = {
     },
 }
 
+-- WoW Forever section settings; only that client's profiles carry the table.
+if EABR.FOREVER then
+    defaults.profile.forever = {
+        camp = false,       -- Camp Benefits reminder; opt-in, it shows whenever the buff is missing
+        whereToShow = {},   -- section "Where to Show" (an absent bucket = shown)
+        customIDs = {},     -- spell IDs the user tracks, in the order added
+    }
+end
+
 local euiPanelOpen = false
 
 -------------------------------------------------------------------------------
@@ -2109,6 +2140,15 @@ function EABR.ResolveReminderSound(dk)
         local co = p.consumables
         if EABR.IsSpecialKey(key) then return co.specialsSound end
         return co.sectionSound
+    elseif prefix == "forever" then
+        local fo = p.forever
+        if not fo then return nil end
+        if key == "rf" or key == "aura" or key == "blessing" or key == "group" then
+            return fo.paladinSound or fo.sectionSound
+        elseif key == "food" or key == "flask" or key == "elixir" or key == "weapon" then
+            return fo.consumableSound or fo.sectionSound
+        end
+        return fo.sectionSound
     end
     return nil
 end
@@ -2120,7 +2160,7 @@ function EABR.HandleAppearSounds(missing)
     local primed = EABR._soundPrimed
     for i = 1, #missing do
         local dk = missing[i].dismissKey
-        if dk and not _dismissedUntilLoad[dk] then
+        if dk and not missing[i].silent and not _dismissedUntilLoad[dk] then
             cur[dk] = true
             if primed and not prev[dk] then
                 local skey = EABR.ResolveReminderSound(dk)
@@ -2195,11 +2235,13 @@ function EABR.ApplyIconBorder(f, protectedOwner)
     local sx, sy = p and p.borderTextureShiftX, p and p.borderTextureShiftY
     local behind = p and p.borderBehind == true
     local level = behind and max(0, f:GetFrameLevel() - 1) or (f:GetFrameLevel() + 3)
+    -- Exact size companion, memoized raw: it only counts while paired with size + texture.
+    local pxRaw = p and p.borderSizePx
 
     -- Layout refreshes can be frequent in a raid. Restyle only when an actual
     -- setting or owner-level change occurred; size changes are handled by the
     -- border frame's anchors/BackdropTemplate size hook.
-    if border._eabrSize == size and border._eabrTexture == texture
+    if border._eabrSize == size and border._eabrTexture == texture and border._eabrPx == pxRaw
         and border._eabrR == r and border._eabrG == g and border._eabrB == b and border._eabrA == a
         and border._eabrOX == ox and border._eabrOY == oy and border._eabrSX == sx and border._eabrSY == sy
         and border._eabrBehind == behind and border._eabrLevel == level then
@@ -2208,8 +2250,9 @@ function EABR.ApplyIconBorder(f, protectedOwner)
 
     border:SetFrameLevel(level)
     EllesmereUI.ApplyBorderStyle(border, size, r, g, b, a, texture,
-        ox, oy, sx, sy, "aurabuffreminders", size)
-    border._eabrSize, border._eabrTexture = size, texture
+        ox, oy, sx, sy, "aurabuffreminders", size, nil,
+        EllesmereUI.BorderPx(pxRaw, size, texture))
+    border._eabrSize, border._eabrTexture, border._eabrPx = size, texture, pxRaw
     border._eabrR, border._eabrG, border._eabrB, border._eabrA = r, g, b, a
     border._eabrOX, border._eabrOY, border._eabrSX, border._eabrSY = ox, oy, sx, sy
     border._eabrBehind, border._eabrLevel = behind, level
@@ -2300,23 +2343,25 @@ local function ShowCombatIcon(iconIdx, m)
         f._text:Hide()
     end
     EABR.ApplyEatingVisual(f, m)
+    EABR.ApplyReminderAvailability(f, m)
     EABR.ApplyIconTooltipData(f, m)
     EABR.ApplyIconQuality(f, (not m.isEating) and m.qualityAtlas or nil)
     if m.groupTotal then
         EABR.ApplyIconGroupCoverage(f, m.groupHave, m.groupTotal)
     else
         EABR.ApplyIconBagCount(f, (not m.isEating) and m.bagCount or nil,
-            (not m.isEating) and m.desaturated or nil,
+            (not m.isEating and not m.silent) and m.desaturated or nil,
             (not m.isEating) and m.substitute or nil)
     end
     f:Show()
     combatActiveIcons[#combatActiveIcons+1] = f
 end
 
--- Left-aligned like the OOC row. Slot 0 is reserved while the provider
--- secure button is shown, and stays reserved after a mid-combat hide until
--- the OOC park -- its SetPoint/EnableMouse are protected under lockdown, so
--- other icons must never slide under it.
+-- Left-aligned from the anchor's left edge; Grow Left right-aligns from its
+-- right edge instead. Slot 0 is reserved while the provider secure button is
+-- shown, and stays reserved after a mid-combat hide until the OOC park -- its
+-- SetPoint/EnableMouse are protected under lockdown, so other icons must never
+-- slide under it: while it is reserved Grow Left keeps the left-aligned row.
 local function LayoutCombatIcons()
     local reserveSlot = EABR._providerCastVisible or EABR._providerCastCombatReserved
     local count = #combatActiveIcons
@@ -2326,6 +2371,10 @@ local function LayoutCombatIcons()
     local baseScale = p.scale or 1.0
     local sz = floor(ICON_SIZE * baseScale + 0.5)
     local xOff = reserveSlot and (sz + spacing) or 0
+    local pt = "TOPLEFT"
+    if p.growDirection == "LEFT" and not reserveSlot then
+        pt, xOff = "TOPRIGHT", -(count - 1) * (sz + spacing)
+    end
     for i, f in ipairs(combatActiveIcons) do
         f:SetSize(sz, sz)
         f:SetAlpha(p.opacity or 1.0)
@@ -2333,7 +2382,7 @@ local function LayoutCombatIcons()
         EABR.SizeIconQuality(f, sz)
         EABR.SizeIconBagCount(f, sz)
         f:ClearAllPoints()
-        f:SetPoint("TOPLEFT", combatAnchor, "TOPLEFT", xOff + (i-1)*(sz+spacing), 0)
+        f:SetPoint(pt, combatAnchor, pt, xOff + (i-1)*(sz+spacing), 0)
     end
 end
 
@@ -2403,13 +2452,14 @@ local function ShowCursorIcon(iconIdx, m)
         f._text:Hide()
     end
     EABR.ApplyEatingVisual(f, m)
+    EABR.ApplyReminderAvailability(f, m)
     EABR.ApplyIconTooltipData(f, m)
     EABR.ApplyIconQuality(f, (not m.isEating) and m.qualityAtlas or nil)
     if m.groupTotal then
         EABR.ApplyIconGroupCoverage(f, m.groupHave, m.groupTotal)
     else
         EABR.ApplyIconBagCount(f, (not m.isEating) and m.bagCount or nil,
-            (not m.isEating) and m.desaturated or nil,
+            (not m.isEating and not m.silent) and m.desaturated or nil,
             (not m.isEating) and m.substitute or nil)
     end
     f:Show()
@@ -2518,6 +2568,7 @@ end
 -- Binds the player's own castable raid buff to the button (OOC only), so the
 -- binding is already warm when combat starts.
 function EABR.SyncProviderCastSpell()
+    if EABR.FOREVER then return end  -- no raid buff providers on WoW Forever; the button is never built there
     if InCombatLockdown() then return end
     local btn = EABR.EnsureProviderCastButton()
     if not btn then return end
@@ -2675,11 +2726,13 @@ function EABR.ApplyIconTooltipData(f, m)
         f._tooltipItem = nil
         f._tooltipSpell = nil
         f._tooltipLabel = nil
+        f._tooltipDetail = nil
         return
     end
     f._tooltipItem = m.tooltipItem or m.itemID or nil
     f._tooltipSpell = m.spellID or (m.data and m.data.castSpell) or nil
     f._tooltipLabel = m.label or nil
+    f._tooltipDetail = m.detail or nil
 end
 
 function EABR.ShowIconTooltip(f)
@@ -2702,12 +2755,13 @@ function EABR.ShowIconTooltip(f)
             elseif f._substitute then
                 GameTooltip:AddLine(EllesmereUI.L("Your preferred food is out - using a backup you own"), 1, 0.82, 0, true)
             end
+            if f._tooltipDetail then GameTooltip:AddLine(f._tooltipDetail, 0.8, 0.8, 0.8, true) end
             GameTooltip:Show()
         end)
         if not ok then GameTooltip:Hide() end
     elseif f._tooltipLabel and f._tooltipLabel ~= "" then
         -- Plain-text reminders use the suite tooltip, never GameTooltip.
-        EllesmereUI.ShowWidgetTooltip(f, tostring(f._tooltipLabel))
+        EllesmereUI.ShowWidgetTooltip(f, tostring(f._tooltipLabel)..(f._tooltipDetail and ("\n"..f._tooltipDetail) or ""))
     end
 end
 
@@ -2939,6 +2993,15 @@ function EABR.EatingTick(self, elapsed)
     end
 end
 
+-- Unavailable buff information is informational, never an item-stock warning.
+-- Reset both properties on every pooled reuse, including combat/cursor frames.
+function EABR.ApplyReminderAvailability(f, m)
+    local quiet = m and m.silent and not m.isEating
+    f._icon:SetDesaturated(not m.isEating and m.desaturated or false)
+    local tint = quiet and 0.55 or 1
+    f._icon:SetVertexColor(tint, tint, tint, 1)
+end
+
 function EABR.ApplyEatingVisual(f, m)
     EABR.ClearEatingVisual(f)
     if not (m and m.isEating) then return end
@@ -3048,7 +3111,7 @@ local function SetIconItem(btn, itemID, texture, label)
         btn:SetAttribute("macrotext1", nil)
         btn:SetAttribute("unit1", nil)
     end
-    btn._icon:SetTexture(texture or GetItemIcon(itemID) or 134400)
+    btn._icon:SetTexture(texture or C_Item.GetItemIconByID(itemID) or 134400)
     btn._tooltipSpell = nil
     btn._tooltipItem = itemID
 end
@@ -3086,6 +3149,7 @@ do
         e.mode = nil; e.spellID = nil; e.itemID = nil; e.macro = nil
         e.texture = nil; e.label = nil; e.unit = nil; e.desaturated = false
         e.tooltipItem = nil
+        e.detail = nil; e.silent = nil
         e.cat = nil; e.data = nil; e.dismissKey = nil; e.petCycleTotal = nil
         e.isEating = nil; e.eatingExpirationTime = nil
         e.qualityAtlas = nil
@@ -3119,6 +3183,7 @@ do
         btn._text:SetText(m.label or "")
         btn._icon:SetDesaturated(m.desaturated or false)
         btn._tooltipLabel = m.label or nil
+        btn._tooltipDetail = m.detail or nil
     end
 end
 
@@ -3148,6 +3213,8 @@ local function HideAllIcons()
     wipe(activeIcons)
 end
 
+-- iconAnchor is pinned by its grow edge (CENTER, LEFT or RIGHT) and the icons
+-- hang off that same edge, so resizing it never moves them.
 local function ResizeAnchorCentered(newW, newH)
     if not iconAnchor or InCombatLockdown() then return end
     iconAnchor:SetSize(newW, newH)
@@ -3181,9 +3248,15 @@ local function LayoutIcons()
     local totalW = (count * sz) + ((count-1) * spacing)
     local textH = 0
     if p.showText then textH = (p.textSize or 11) + abs(p.textYOffset or -2) end
-    -- Center-grow: icons pin to the anchor's CENTER and spread symmetrically so the row's center stays fixed as
-    -- icons are added/removed, and resizing the anchor (unlock overlay) never shifts them; +textH/2 keeps the row at the icon+text box's top, matching the combat pool.
-    local startX = -(totalW / 2) + (sz / 2)
+    -- Icons hang off the anchor's grow edge. Center-grow spreads them symmetrically so the row's center stays fixed
+    -- as icons are added/removed; +textH/2 keeps the row at the icon+text box's top, matching the combat pool.
+    -- Grow Right/Left hang them from the TOPLEFT/TOPRIGHT corner so that edge stays fixed instead.
+    local pt, startX, yOff = "CENTER", -(totalW / 2) + (sz / 2), textH/2
+    if p.growDirection == "RIGHT" then
+        pt, startX, yOff = "TOPLEFT", 0, 0
+    elseif p.growDirection == "LEFT" then
+        pt, startX, yOff = "TOPRIGHT", -(count - 1) * (sz + spacing), 0
+    end
     for i, btn in ipairs(allIcons) do
         btn:SetSize(sz, sz)
         btn:SetAlpha(p.opacity or 1.0)
@@ -3193,7 +3266,7 @@ local function LayoutIcons()
         EABR.SizeIconQuality(btn, sz)
         EABR.SizeIconBagCount(btn, sz)
         btn:ClearAllPoints()
-        btn:SetPoint("CENTER", iconAnchor, "CENTER", startX + (i-1)*(sz+spacing), textH/2)
+        btn:SetPoint(pt, iconAnchor, pt, startX + (i-1)*(sz+spacing), yOff)
     end
     -- Size the anchor to the row so the unlock mode overlay covers it.
     ResizeAnchorCentered(totalW, sz + textH)
@@ -3225,14 +3298,15 @@ local function ShowIcon(iconIdx, m)
     local baseScale = p.scale or 1.0
     local sz = floor(ICON_SIZE * baseScale + 0.5)
     RemoveGlow(btn)
-    ApplyGlow(btn, glowType, gr, gg, gb, sz)
+    if not m.silent then ApplyGlow(btn, glowType, gr, gg, gb, sz) end
     EABR.ApplyEatingVisual(btn, m)
+    EABR.ApplyReminderAvailability(btn, m)
     EABR.ApplyIconQuality(btn, (not m.isEating) and m.qualityAtlas or nil)
     if m.groupTotal then
         EABR.ApplyIconGroupCoverage(btn, m.groupHave, m.groupTotal)
     else
         EABR.ApplyIconBagCount(btn, (not m.isEating) and m.bagCount or nil,
-            (not m.isEating) and m.desaturated or nil,
+            (not m.isEating and not m.silent) and m.desaturated or nil,
             (not m.isEating) and m.substitute or nil)
     end
     if p.showText and not m.isEating then
@@ -3482,9 +3556,11 @@ end
 function EABR.EmitWeaponEnchantReminders(missing, co)
     local hasMH, mhExpire, _, _, hasOH, ohExpire = EABR.WeaponEnchants()
     for i = 1, 2 do
-        local slot = (i == 1) and 16 or 17
-        local has = (i == 1) and hasMH or hasOH
-        local expire = (i == 1) and mhExpire or ohExpire
+        local slot, has, expire
+        -- Plain if/else, not "cond and a or b": that idiom silently falls
+        -- through to b whenever a (hasMH) is false, corrupting slot 16.
+        if i == 1 then slot, has, expire = 16, hasMH, mhExpire
+        else slot, has, expire = 17, hasOH, ohExpire end
         local r = EABR._resolved.we[slot]
         local cat = r.cat
         local shouldRemind = false
@@ -3501,7 +3577,7 @@ function EABR.EmitWeaponEnchantReminders(missing, co)
             local e = AcquireEntry()
             e.mode = "macro"
             e.macro = "/use item:" .. bestItemID .. "\n/use " .. slot
-            e.texture = GetItemIcon(bestItemID) or 134400
+            e.texture = C_Item.GetItemIconByID(bestItemID) or 134400
             -- Localizes the full slot name THEN shortens: ShortLabel truncates on whitespace (English -> Main/Off, space-less locales like zhTW stay intact). L() on the pre-truncated word would collide with the generic Off (disabled) translation.
             e.label = ShortLabel(EllesmereUI.L(slot == 16 and "Main Hand" or "Off Hand"))
             e.tooltipItem = bestItemID
@@ -3676,7 +3752,7 @@ local specialsActive = EABR.SectionShows(co.specialsWhereToShow, inInstance)
                 if runeItem and (co.showWithoutItem ~= false or rr.hasBags) then
                     local e = AcquireEntry()
                     e.mode = "item"; e.itemID = runeItem
-                    e.texture = GetItemIcon(runeItem); e.label = EllesmereUI.L(ShortLabel("Augment Rune"))
+                    e.texture = C_Item.GetItemIconByID(runeItem); e.label = EllesmereUI.L(ShortLabel("Augment Rune"))
                     e.qualityAtlas = EABR.GetItemQualityAtlas(runeItem)
                     e.bagCount = CachedGetItemCount(runeItem)
                     e.desaturated = not rr.hasBags
@@ -3710,7 +3786,7 @@ local specialsActive = EABR.SectionShows(co.specialsWhereToShow, inInstance)
                 if flaskItemID and (co.showWithoutItem ~= false or rf.hasBags) then
                     local e = AcquireEntry()
                     e.mode = "item"; e.itemID = flaskItemID
-                    e.texture = GetItemIcon(flaskItemID) or 134830
+                    e.texture = C_Item.GetItemIconByID(flaskItemID) or 134830
                     e.label = EllesmereUI.L("Flask")
                     e.qualityAtlas = EABR.GetItemQualityAtlas(flaskItemID)
                     e.bagCount = CachedGetItemCount(flaskItemID)
@@ -3728,7 +3804,7 @@ local specialsActive = EABR.SectionShows(co.specialsWhereToShow, inInstance)
                 if foodItemID and (co.showWithoutItem ~= false or EABR._resolved.food.hasBags) then
                     local e = AcquireEntry()
                     e.mode = "item"; e.itemID = foodItemID
-                    e.texture = GetItemIcon(foodItemID) or 134062
+                    e.texture = C_Item.GetItemIconByID(foodItemID) or 134062
                     e.label = EllesmereUI.L("Food")
                     e.qualityAtlas = EABR.GetItemQualityAtlas(foodItemID)
                     e.bagCount = CachedGetItemCount(foodItemID)
@@ -3762,7 +3838,7 @@ local specialsActive = EABR.SectionShows(co.specialsWhereToShow, inInstance)
                     if not PlayerHasInkyBlackness() and hasPotion then
                         local e = AcquireEntry()
                         e.mode = "item"; e.itemID = INKY_BLACK_ITEM
-                        e.texture = GetItemIcon(INKY_BLACK_ITEM)
+                        e.texture = C_Item.GetItemIconByID(INKY_BLACK_ITEM)
                         e.label = EllesmereUI.L(ShortLabel("Inky Black Potion"))
                         e.qualityAtlas = EABR.GetItemQualityAtlas(INKY_BLACK_ITEM)
                         e.bagCount = CachedGetItemCount(INKY_BLACK_ITEM)
@@ -3893,7 +3969,19 @@ end
 local _refreshMissing = {}
 local UpdateDurationTicker  -- forward-declare; defined after RequestRefresh
 
+-- The separately loaded Forever detector owns current buff state and timers.
+function EABR.CollectForever(missing, inInstance, inPvP, restricted)
+    if EABR.ForeverSupport then
+        EABR.ForeverSupport.Collect(db.profile.forever, missing, AcquireEntry, Tex,
+            EABR.SectionShows, inInstance, inPvP)
+    end
+end
+
 local function Refresh()
+    if EABR.ForeverSupport then
+        EABR.ForeverSupport.CancelTimer()
+        EABR.ForeverSupport.SetGroup(false)
+    end
     _cachedOutline = nil
     EABR._nextDurationRefreshTime = nil
     if not db then return end
@@ -3913,12 +4001,12 @@ local function Refresh()
         return
     end
 
-    -- Suppresses while dead or in a rested area (city/inn) -- rested areas
-    -- always stay hidden, independent of every "Where to Show" setting.
+    -- Death suppresses all reminders. Forever permits city/inn reminders when
+    -- explicitly enabled; normal Where to Show filters still apply below.
     if UnitIsDeadOrGhost("player") then
         HideCombatIcons(); HideCursorIcons(); HideAllIcons(); return
     end
-    if IsResting() then
+    if IsResting() and not (EABR.FOREVER and db.profile.forever and db.profile.forever.showRested == true) then
         HideCombatIcons(); HideCursorIcons()
         if InCombat() then FadeOutSecureIcons() else HideAllIcons() end
         return
@@ -3949,10 +4037,15 @@ local function Refresh()
     local inPvP = InPvPInstance()
     local restricted = inCombat or inKeystone
 
+    -- WoW Forever: the one Forever section stands in for the four collectors below.
+    if EABR.FOREVER and remindersOn then
+        EABR.CollectForever(missing, inInstance, inPvP, restricted)
+    end
+
     ---------------------------------------------------------------------------
     --  1) Raid Buffs (runs in and out of combat)
     ---------------------------------------------------------------------------
-    if remindersOn then
+    if remindersOn and not EABR.FOREVER then
         CollectRaidBuffs(missing, playerClass, inInstance, inCombat)
     end
 
@@ -3960,7 +4053,7 @@ local function Refresh()
     --  2) Auras: OOC normally; in restricted contexts only reminders whose
     --  detection survives the aura lock (stances/forms + whitelisted IDs).
     ---------------------------------------------------------------------------
-    if remindersOn then
+    if remindersOn and not EABR.FOREVER then
         CollectAuras(missing, playerClass, specID, inInstance, restricted)
     end
 
@@ -3968,14 +4061,14 @@ local function Refresh()
     --  3) Consumables: OOC (non-PvP) normally; in restricted contexts the
     --  trackable subset only. PvP stays fully suppressed.
     ---------------------------------------------------------------------------
-    if remindersOn and not inPvP then
+    if remindersOn and not inPvP and not EABR.FOREVER then
         CollectConsumables(missing, playerClass, specID, inInstance, inKeystone, inCombat)
     end
 
     ---------------------------------------------------------------------------
     --  4) Pet Reminders (combat-safe: UnitExists/UnitIsDead unrestricted); suppressed for petless specs, Grimoire of Sacrifice, etc.
     ---------------------------------------------------------------------------
-    if remindersOn and PET_CLASSES[playerClass] then
+    if remindersOn and not EABR.FOREVER and PET_CLASSES[playerClass] then
         local co = db.profile.consumables
         if co and co.enabled and co.enabled.pet ~= false and EABR.SectionShows(co.specialsWhereToShow, inInstance) then
             local suppress = false
@@ -4130,7 +4223,7 @@ local function Refresh()
                             local gr, gg, gb = ResolveGlowTint(p)
                             local baseScale = p.scale or 1.0
                             local sz = floor(ICON_SIZE * baseScale + 0.5)
-                            ApplyGlow(f, p.glowType or 0, gr, gg, gb, sz)
+                            if not m.silent then ApplyGlow(f, p.glowType or 0, gr, gg, gb, sz) end
                         end
                     end
                 end
@@ -4192,7 +4285,7 @@ local function Refresh()
                         local gr, gg, gb = ResolveGlowTint(p)
                         local baseScale = p.scale or 1.0
                         local sz = floor(ICON_SIZE * baseScale + 0.5)
-                        ApplyGlow(f, p.glowType or 0, gr, gg, gb, sz)
+                        if not m.silent then ApplyGlow(f, p.glowType or 0, gr, gg, gb, sz) end
                     end
                 else
                     iconIdx = iconIdx + 1
@@ -4229,7 +4322,7 @@ local function Refresh()
         EllesmereUI.SetElementVisibility(iconAnchor, false)
     end
 
-    UpdateDurationTicker()
+    if not EABR.FOREVER then UpdateDurationTicker() end  -- expiry thresholds are retail-only
 end
 
 local REFRESH_THROTTLE_COMBAT = 0.5
@@ -4296,6 +4389,11 @@ end
 -------------------------------------------------------------------------------
 --  Unlock Mode
 -------------------------------------------------------------------------------
+-- Nominal two-icon row width from settings alone: the nil-position grow edge and the converter's empty-row width.
+function EABR.NominalRowW(d)
+    return 2 * floor(ICON_SIZE * (d.scale or 1.0) + 0.5) + (d.iconSpacing or 8)
+end
+
 local function ApplyUnlockPos()
     if not iconAnchor or not db then return end
     -- Skip for unlock-anchored elements (anchor system is authority)
@@ -4321,11 +4419,63 @@ local function ApplyUnlockPos()
         iconAnchor:ClearAllPoints()
         iconAnchor:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, px, py)
     else
-        -- No saved position: centers the row on screen (+ configured offset). A CENTER anchor keeps the row's center fixed as icon count changes, same as above; LayoutIcons centers the row on this anchor and owns its size.
+        -- No saved position: the row sits at the configured offset from screen center, anchored by its grow edge.
+        -- Grow Right/Left place that edge half a nominal two-icon row out (settings only, never the live width) so
+        -- it never follows the icon count; LayoutIcons hangs the icons off the same edge and owns the anchor's size.
         local d = db.profile.display
+        local growDir = d.growDirection
         iconAnchor:ClearAllPoints()
-        iconAnchor:SetPoint("CENTER", UIParent, "CENTER", d.xOffset or 0, d.yOffset or 0)
+        if growDir == "RIGHT" then
+            iconAnchor:SetPoint("LEFT", UIParent, "CENTER", (d.xOffset or 0) - EABR.NominalRowW(d) / 2, d.yOffset or 0)
+        elseif growDir == "LEFT" then
+            iconAnchor:SetPoint("RIGHT", UIParent, "CENTER", (d.xOffset or 0) + EABR.NominalRowW(d) / 2, d.yOffset or 0)
+        else
+            iconAnchor:SetPoint("CENTER", UIParent, "CENTER", d.xOffset or 0, d.yOffset or 0)
+        end
     end
+end
+
+-- Moves a saved position onto the new grow edge (Grow Right = LEFT, Grow Left = RIGHT, else CENTER) without
+-- moving the row. Runs only on a grow direction change or a spec layer restoring a position banked under another
+-- direction: the apply path never writes the DB, and a nil position stays nil. Only positions this module writes
+-- (CENTER, LEFT or RIGHT of UIParent's CENTER) convert.
+function EABR.UpdateUnlockPosForGrowDir(newGrowDir)
+    local pos = db.profile.unlockPos
+    if not pos or not pos.point or (pos.relPoint or pos.point) ~= "CENTER" then return end
+    local curPoint = pos.point
+    if curPoint ~= "CENTER" and curPoint ~= "LEFT" and curPoint ~= "RIGHT" then return end
+    local targetPoint = (newGrowDir == "RIGHT" and "LEFT") or (newGrowDir == "LEFT" and "RIGHT") or "CENTER"
+    if curPoint == targetPoint then return end
+    local w = iconAnchor and iconAnchor:GetWidth() or 0
+    if w <= 1 then w = EABR.NominalRowW(db.profile.display) end
+    local cx = pos.x or 0
+    if curPoint == "LEFT" then
+        cx = cx + (w / 2)
+    elseif curPoint == "RIGHT" then
+        cx = cx - (w / 2)
+    end
+    if targetPoint == "LEFT" then
+        pos.x = cx - (w / 2)
+    elseif targetPoint == "RIGHT" then
+        pos.x = cx + (w / 2)
+    else
+        pos.x = cx
+    end
+    pos.point = targetPoint
+    pos.relPoint = "CENTER"
+end
+
+function EllesmereUI.GetAuraBuffGrowDir()
+    local d = db and db.profile and db.profile.display
+    return d and d.growDirection or "CENTER"
+end
+
+function EllesmereUI.SetAuraBuffGrowDir(v)
+    if not db or not db.profile or not db.profile.display then return end
+    db.profile.display.growDirection = v
+    EABR.UpdateUnlockPosForGrowDir(v)
+    ApplyUnlockPos()
+    LayoutIcons()
 end
 
 local function RegisterUnlockElements()
@@ -4361,18 +4511,50 @@ local function RegisterUnlockElements()
                     textH = (p.textSize or 11) + abs(p.textYOffset or -2)
                 end
                 local h = sz + textH
-                -- Resizes the anchor for the overlay; iconAnchor is CENTER-anchored and icons hang off its CENTER, so this never moves them.
+                -- Resizes the anchor for the overlay
                 if iconAnchor then ResizeAnchorCentered(w, h) end
                 return w, h
             end,
             savePos = function(key, point, relPoint, x, y)
+                -- Unlock mode hands over the row's CENTER; Grow Right/Left store their fixed edge instead.
+                local growDir = db.profile.display.growDirection
+                if (growDir == "RIGHT" or growDir == "LEFT") and point == "CENTER" and relPoint == "CENTER" then
+                    local halfW = (iconAnchor and iconAnchor:GetWidth() or 0) / 2
+                    if growDir == "RIGHT" then
+                        point, x = "LEFT", x - halfW
+                    else
+                        point, x = "RIGHT", x + halfW
+                    end
+                end
                 db.profile.unlockPos = {point=point, relPoint=relPoint, x=x, y=y}
                 if not EllesmereUI._unlockActive then
                     ApplyUnlockPos()
                 end
             end,
             loadPos = function()
+                local pos = db.profile.unlockPos
+                -- A stored grow edge (LEFT/RIGHT of UIParent's CENTER) reports the row's CENTER, the form unlock mode works in.
+                -- That CENTER follows the live width, so a Discard after the icon count changed moves the edge by half the change.
+                if not pos or (pos.point ~= "LEFT" and pos.point ~= "RIGHT") or pos.relPoint ~= "CENTER" then
+                    return pos
+                end
+                local halfW = (iconAnchor and iconAnchor:GetWidth() or 0) / 2
+                return {
+                    point = "CENTER",
+                    relPoint = "CENTER",
+                    x = (pos.x or 0) + ((pos.point == "LEFT") and halfW or -halfW),
+                    y = pos.y or 0,
+                }
+            end,
+            -- Spec-override unlock layers bank the stored table itself, so a Grow Right/Left edge survives a
+            -- layer round trip at any icon count; one banked under another direction moves onto the current edge.
+            loadRawPos = function()
                 return db.profile.unlockPos
+            end,
+            saveRawPos = function(_, p)
+                if not (p and p.point) then return end
+                db.profile.unlockPos = {point=p.point, relPoint=p.relPoint or p.point, x=p.x, y=p.y}
+                EABR.UpdateUnlockPosForGrowDir(db.profile.display.growDirection)
             end,
             clearPos = function()
                 db.profile.unlockPos = nil
@@ -4652,14 +4834,18 @@ end
 _G._EABR_BeaconRefresh = BeaconRefresh
 _G._EABR_BeaconAnchor = function() return _B.anchor end
 
-_B.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-_B.frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-_B.frame:RegisterEvent("SPELLS_CHANGED")
-_B.frame:RegisterEvent("PLAYER_TALENT_UPDATE")
-_B.frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-_B.frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
-_B.frame:RegisterEvent("GROUP_ROSTER_UPDATE")
-_B.frame:RegisterEvent("PLAYER_LEVEL_CHANGED")
+-- Beacon tracking is retail Holy Paladin; WoW Forever registers nothing here
+-- (BeaconInit is skipped there too, so the handler would only ever return).
+if not EABR.FOREVER then
+    _B.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    _B.frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    _B.frame:RegisterEvent("SPELLS_CHANGED")
+    _B.frame:RegisterEvent("PLAYER_TALENT_UPDATE")
+    _B.frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+    _B.frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
+    _B.frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+    _B.frame:RegisterEvent("PLAYER_LEVEL_CHANGED")
+end
 _B.frame:SetScript("OnEvent", function(_, e, id)
     if not _B.isPaladin then return end
     if e == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" or e == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
@@ -4798,6 +4984,7 @@ function EABR:OnEnable()
     -- Talent reminder migration handled by EllesmereUIABR_TalentReminders.lua
 
     _G._EABR_RequestRefresh = RequestRefresh
+    if EABR.ForeverSupport then EABR.ForeverSupport.Init(RequestRefresh) end
     _G._EABR_ApplyIconBorder = EABR.ApplyIconBorder
     _G._EABR_ApplyAllIconBorders = EABR.ApplyAllIconBorders
     _G._EABR_HideAllIcons = HideAllIcons
@@ -4903,16 +5090,12 @@ function EABR:OnEnable()
 
     -- Hook EUI panel show/hide
     if EllesmereUI then
-        if EllesmereUI.RegisterOnShow then
-            EllesmereUI:RegisterOnShow(function()
-                euiPanelOpen = true; HideAllIcons(); BeaconRefresh()
-            end)
-        end
-        if EllesmereUI.RegisterOnHide then
-            EllesmereUI:RegisterOnHide(function()
-                euiPanelOpen = false; RequestRefresh(); BeaconRefresh()
-            end)
-        end
+        EllesmereUI:RegisterOnShow(function()
+            euiPanelOpen = true; HideAllIcons(); BeaconRefresh()
+        end)
+        EllesmereUI:RegisterOnHide(function()
+            euiPanelOpen = false; RequestRefresh(); BeaconRefresh()
+        end)
     end
 
     -- Group spec intel over addon comms (LibSpecialization): the lib
@@ -4939,7 +5122,7 @@ function EABR:OnEnable()
     EABR.ScanEatingState()
     EABR.SyncProviderCastSpell()
     RequestRefresh()
-    BeaconInit()
+    if not EABR.FOREVER then BeaconInit() end  -- retail Holy Paladin beacons only
     C_Timer.After(0.5, RegisterUnlockElements)
 
     -- Registers broad UNIT_AURA only when the class needs group aura tracking AND only OOC: it fires 100+/sec in a raid, but in-combat CollectRaidBuffs only checks the player's own auras (PlayerHasAuraByID), so group events are pure waste. Evoker keeps broad in combat for ownOnRaid cache updates but skips RequestRefresh on group events (handler below).
@@ -4986,12 +5169,15 @@ function EABR:OnEnable()
         end
     end
     _G._EABR_UpdateGroupAuraRegistration = UpdateGroupAuraRegistration
-    UpdateGroupAuraRegistration()
+    if not EABR.FOREVER then UpdateGroupAuraRegistration() end  -- Forever keeps the player-only UNIT_AURA from file scope
 
     -- Register spellcast tracking for Hunters (combat reminder for Hunter's Mark)
-    if GetPlayerClass() == "HUNTER" then
+    if not EABR.FOREVER and GetPlayerClass() == "HUNTER" then
         mainFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     end
+
+    -- WoW Forever tracks no group buffs, so the range tracking below has nothing to feed.
+    if EABR.FOREVER then return end
 
     ---------------------------------------------------------------------------
     --  Range updates: UNIT_IN_RANGE_UPDATE mirrors the raid frames' range path, so range changes retrigger group-buff evaluation without polling.
@@ -5103,6 +5289,9 @@ mainFrame:SetScript("OnEvent", function(_, e, arg1, arg2, arg3)
     if e == "PLAYER_REGEN_DISABLED" then
         -- First pull of this dungeon visit: the elevated pre-key/pre-pull
         -- threshold (EABR.GetShowUnderMinutes' showUnderMPlus) is over.
+        -- WoW Forever has no pre-key window, no group aura tracking and no
+        -- Hunter's Mark reminder: the whole retail pull bookkeeping is skipped.
+        if not EABR.FOREVER then
         MarkDungeonPullStarted()
         -- Drops broad UNIT_AURA in combat unless group tracking is needed: Evoker keeps broad for ownOnRaid cache updates; the provider view ("others missing") keeps it for timely group coverage refreshes.
         local rbSW = db and db.profile.raidBuffs and db.profile.raidBuffs.showWhen
@@ -5115,6 +5304,7 @@ mainFrame:SetScript("OnEvent", function(_, e, arg1, arg2, arg3)
             and UnitExists("target") and C_UnitAuras.GetUnitAuraBySpellID("target", 257284) then
             _huntersMarkNeeded = false
         end
+        end -- not FOREVER
         -- Hide secure buttons before lockdown. ENCOUNTER_START may already have
         -- set our combat flag, so HideAllIcons guards on InCombatLockdown itself.
         HideAllIcons()
@@ -5175,7 +5365,7 @@ mainFrame:SetScript("OnEvent", function(_, e, arg1, arg2, arg3)
     if e == "UNIT_AURA" then
         -- arg1 = unit token. Player aura changes always refresh; group member changes only matter for Evoker ownOnRaid cache updates and OOC raid buff checks (broad UNIT_AURA is only registered for classes needing group tracking).
         if arg1 == "player" then
-            EABR.UpdateEatingState(arg2)
+            if not EABR.FOREVER then EABR.UpdateEatingState(arg2) end  -- eating channel feeds the retail food reminder only
             local isEvoker = _cachedPlayerClass == "EVOKER"
             if isEvoker and InCombat() and IsInGroup() then
                 for _, id in ipairs(_ownOnRaidIDs) do
@@ -5266,7 +5456,8 @@ local function DetectUsedItem()
     for k, v in pairs(_bagCounts) do _prevBagCounts[k] = v end
 end
 
-do
+-- Item-use tracking serves the consumable pickers; WoW Forever has no consumable reminders.
+if not EABR.FOREVER then
     local f = CreateFrame("Frame")
     f:RegisterEvent("BAG_UPDATE_DELAYED")
     f:RegisterEvent("PLAYER_LOGIN")
@@ -5283,6 +5474,22 @@ do
     end)
 end
 
+if EABR.FOREVER then
+    -- WoW Forever: only what the Forever section needs -- combat edges, zone
+    -- changes, the player's own aura changes, vehicles and the death states.
+    mainFrame:RegisterEvent("ENCOUNTER_START")
+    mainFrame:RegisterEvent("ENCOUNTER_END")
+    mainFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+    mainFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    mainFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    mainFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    mainFrame:RegisterUnitEvent("UNIT_AURA", "player")
+    mainFrame:RegisterUnitEvent("UNIT_ENTERED_VEHICLE", "player")
+    mainFrame:RegisterUnitEvent("UNIT_EXITED_VEHICLE", "player")
+    mainFrame:RegisterEvent("PLAYER_DEAD")
+    mainFrame:RegisterEvent("PLAYER_ALIVE")
+    mainFrame:RegisterEvent("PLAYER_UNGHOST")
+else
 mainFrame:RegisterEvent("ENCOUNTER_START")
 mainFrame:RegisterEvent("ENCOUNTER_END")
 mainFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -5313,6 +5520,7 @@ mainFrame:RegisterEvent("BAG_UPDATE")
 mainFrame:RegisterUnitEvent("UNIT_PET", "player")
 -- UNIT_PET fires on pet summon/dismiss, NOT stance changes. Pet on Passive reacts to the pet's command state via the pet action bar -- PET_BAR_UPDATE is that event; without it the reminder only re-evaluated on reload.
 mainFrame:RegisterEvent("PET_BAR_UPDATE")
+end
 
 -------------------------------------------------------------------------------
 --  Ready Check Mana Warning: centered text warning for ~10s when a ready check fires in a raid and the player is a healer under 80% mana. Out-of-combat only.
@@ -5335,7 +5543,7 @@ local SetupReadyCheckManaWarning = function()
         local c = p and p.consumables
         local col = c and c.rcManaWarnColor
         if col and col.r then return col.r, col.g, col.b end
-        local mc = EllesmereUI.GetPowerColor and EllesmereUI.GetPowerColor("MANA")
+        local mc = EllesmereUI.GetPowerColor("MANA")
         if mc then
             return math.min(mc.r * 1.5, 1), math.min(mc.g * 1.5, 1), math.min(mc.b * 1.5, 1)
         end
@@ -5359,8 +5567,8 @@ local SetupReadyCheckManaWarning = function()
         warnFrame:SetPoint("CENTER", UIParent, "CENTER",
             (c and c.rcManaWarnX) or 0, 75 + ((c and c.rcManaWarnY) or 0))
         local font = ResolveFontPath(c and c.rcManaWarnFont)
-        local outline = GetABROutline()
-        if EllesmereUI and EllesmereUI.PrimeFontShadow then EllesmereUI.PrimeFontShadow(warnFS, outline == "" and GetABRUseShadow()) end
+        local outline = EllesmereUI.GetFontOutlineFlag("auraBuff")
+        EllesmereUI.PrimeFontShadow(warnFS, outline == "" and EllesmereUI.GetFontUseShadow("auraBuff"))
         warnFS:SetFont(font, (c and c.rcManaWarnSize) or 48, outline)
         -- Explicit white instance color: tinted purely via SetVertexColor (curve result); with no instance color it would inherit the primed shadow FontObject's color, which resolves BLACK.
         warnFS:SetTextColor(1, 1, 1, 1)
@@ -5479,5 +5687,6 @@ local SetupReadyCheckManaWarning = function()
     _G._EABR_RCWarnHidePreview = HideWarning
     _G._EABR_RCWarnUpdateReg = UpdateReadyCheckRegistration
 end
-SetupReadyCheckManaWarning()
+-- The warning reads retail spec roles and lives in the consumables options; WoW Forever skips it.
+if not EABR.FOREVER then SetupReadyCheckManaWarning() end
 

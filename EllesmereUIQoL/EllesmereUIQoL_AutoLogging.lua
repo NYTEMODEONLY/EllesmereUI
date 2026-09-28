@@ -77,6 +77,13 @@ local function ZoneShouldBeLogged()
     if not c.enabled then return false end
 
     local _, zoneType, rawDiff, _, playerCap, _, _, rawMapID = GetInstanceInfo()
+    -- Forever dungeons and raids use their native instance types, without
+    -- Retail map thresholds or Mythic difficulty requirements.
+    if EUI_FOREVER then
+        if zoneType == "party" then return GetTrigger(c, "log5pp") end
+        if zoneType == "raid" then return GetTrigger(c, "logNormal") end
+        return false
+    end
     local diff  = tonumber(rawDiff)
     local mapID = tonumber(rawMapID)
     if not diff or not mapID then return false end
@@ -144,6 +151,8 @@ local events = {
     ZONE_CHANGED_NEW_AREA = function() C_Timer.After(2, ApplyLoggingState) end,
     CHALLENGE_MODE_START   = function() C_Timer.After(1, ApplyLoggingState) end,
 }
+
+if EUI_FOREVER then events.CHALLENGE_MODE_START = nil end
 
 -- Zone events are registered only while the feature is enabled, so a disabled
 -- feature costs nothing on zone changes. The options toggle calls

@@ -128,6 +128,7 @@ end
 
 local _mountRowHook = false
 local function Skin_Collections()
+    if EUI_FOREVER then return end -- Camelot side tabs/companions use the dedicated adapter.
     local f = _G.CollectionsJournal
     if not f then return end
     WSkin.Shell("collections", f)
@@ -497,6 +498,7 @@ end
 
 local _spellItemHook = false
 local function Skin_PlayerSpells()
+    if EUI_FOREVER then return end -- Camelot icon tabs/ranks use the dedicated skin.
     local f = _G.PlayerSpellsFrame
     if not f then return end
     WSkin.Shell("playerspells", f)
@@ -2566,13 +2568,38 @@ local GUILD_BUTTON_KEYS = {
     "AcceptButton", "DeclineButton", "ApplyButton", "FindAGuildButton",
     "OkayButton", "AllButton", "NoneButton",
 }
-local GUILD_TAB_KEYS = { "ChatTab", "RosterTab", "GuildBenefitsTab", "GuildInfoTab" }
+local GUILD_TAB_KEYS = { "ChatTab", "RosterTab", "GuildBenefitsTab", "GuildInfoTab", EUI_FOREVER and "GuildPreferredPlaySettingsTab" or nil }
+-- Keep Forever's native scrollbar arrow glyphs without changing the shared
+-- engine or the Retail treatment. Native enabled/disabled atlases stay intact.
+ns.GuildScrollBar = function(bar)
+    if not EUI_FOREVER or not bar then WSkin.ScrollBar(bar); return end
+    local arrows = {}
+    for _, key in ipairs({ "Back", "Forward" }) do
+        local button = bar[key]
+        if button and button.Texture then
+            arrows[#arrows + 1] = { button.Texture, button.Texture:GetAlpha() }
+        end
+    end
+    WSkin.ScrollBar(bar)
+    for _, arrow in ipairs(arrows) do arrow[1]:SetAlpha(arrow[2]) end
+end
+ns.GuildScrollBarsIn = function(frame, depth)
+    if not EUI_FOREVER then WSkin.ScrollBarsIn(frame, depth); return end
+    depth = depth or 0
+    if not frame or depth > 7 or frame:IsForbidden() then return end
+    for _, child in ipairs({ frame:GetChildren() }) do
+        if child and not WSkin.IsForeignFrame(child, frame) then
+            if child.Track and (child.Back or child.Forward) then ns.GuildScrollBar(child) end
+            ns.GuildScrollBarsIn(child, depth + 1)
+        end
+    end
+end
 local function SkinGuildControlHost(host)
     if not host then return end
     for _, key in ipairs(GUILD_BUTTON_KEYS) do
         if host[key] then WSkin.Button(host[key]) end
     end
-    if host.ScrollBar then WSkin.ScrollBar(host.ScrollBar) end
+    if host.ScrollBar then ns.GuildScrollBar(host.ScrollBar) end
     if host.RankDropdown then WSkin.Dropdown(host.RankDropdown) end
     if host.InsetFrame then WSkin.Inset(host.InsetFrame) end
 end
@@ -2580,8 +2607,8 @@ local function SkinGuildControls(f)
     SkinGuildControlHost(f)
     for _, key in ipairs(GUILD_CONTROL_HOSTS) do SkinGuildControlHost(f[key]) end
     if f.Chat then SkinGuildControlHost(f.Chat) end
-    if f.MemberList and f.MemberList.ScrollBar then WSkin.ScrollBar(f.MemberList.ScrollBar) end
-    if f.CommunitiesList and f.CommunitiesList.ScrollBar then WSkin.ScrollBar(f.CommunitiesList.ScrollBar) end
+    if f.MemberList and f.MemberList.ScrollBar then ns.GuildScrollBar(f.MemberList.ScrollBar) end
+    if f.CommunitiesList and f.CommunitiesList.ScrollBar then ns.GuildScrollBar(f.CommunitiesList.ScrollBar) end
 end
 
 local function SkinGuildDialogs(f)
@@ -2640,7 +2667,7 @@ local function SkinGuildDialogs(f)
         for _, k in ipairs({ "ClubFocusDropdown", "LookingForDropdown", "LanguageDropdown" }) do
             if csd[k] then WSkin.Dropdown(csd[k]) end
         end
-        WSkin.ScrollBarsIn(csd)
+        ns.GuildScrollBarsIn(csd)
     end
     -- Guild recruitment settings dialog ("List My Guild in Guild Finder"):
     -- parented INSIDE CommunitiesFrame like EditStreamDialog, so the art sweeps strip
@@ -2668,7 +2695,7 @@ local function SkinGuildDialogs(f)
         for _, k in ipairs({ "ClubFocusDropdown", "LookingForDropdown", "LanguageDropdown" }) do
             if rd[k] then WSkin.Dropdown(rd[k]) end
         end
-        WSkin.ScrollBarsIn(rd)
+        ns.GuildScrollBarsIn(rd)
     end
     -- Create/Edit Channel dialog: parented INSIDE CommunitiesFrame, so the recursive
     -- Bg-family art sweeps reach it and strip its fill (standalone UIParent dialogs are
@@ -2707,7 +2734,7 @@ local function SkinGuildDialogs(f)
             if nsd[k] then WSkin.Button(nsd[k]) end
         end
         if nsd.CommunitiesListDropdown then WSkin.Dropdown(nsd.CommunitiesListDropdown) end
-        WSkin.ScrollBarsIn(nsd)
+        ns.GuildScrollBarsIn(nsd)
     end
 end
 
@@ -2726,7 +2753,7 @@ local function Skin_Guild()
         WSkin.Register(f.PortraitOverlay, true)
     end
     if f.StreamDropdown then
-        if f.StreamDropdown.NotificationOverlay then
+        if f.StreamDropdown.NotificationOverlay and not EUI_FOREVER then
             WSkin.FadeRegions(f.StreamDropdown.NotificationOverlay)
             f.StreamDropdown.NotificationOverlay:SetAlpha(0)
         end
@@ -2745,7 +2772,8 @@ local function Skin_Guild()
     end
     -- Minimized view swaps the community-list sidebar for a dropdown; style it.
     if f.CommunitiesListDropdown then WSkin.Dropdown(f.CommunitiesListDropdown) end
-    -- Side tabs, EJ-style plates without geometry fights: the dark box +
+    -- Forever retains RightSideTabTemplate's raw icon and checked outline.
+    -- Retail side tabs, EJ-style plates without geometry fights: the dark box +
     -- black border anchor AROUND THE ICON, never the tab, so the plate rides
     -- along wherever Blizzard's display-mode layout seats the tab. Tab size,
     -- icon anchors and the native tab chain are never touched. Only the root
@@ -2753,6 +2781,60 @@ local function Skin_Guild()
     for _, k in ipairs(GUILD_TAB_KEYS) do
         local tab = f[k]
         if tab and not tab:IsForbidden() then
+            if EUI_FOREVER then
+                -- Do not SquareTabIcon: it crops the icon and erases the native
+                -- selected/hover textures. Notification and restricted-chat
+                -- overlays, native layout and availability remain untouched.
+                local checked = tab.GetCheckedTexture and tab:GetCheckedTexture()
+                if checked then checked:SetVertexColor(Theme.accR, Theme.accG, Theme.accB) end
+                local icon = tab.Icon
+                if icon and tab.CreateMaskTexture and icon.AddMaskTexture then
+                    local td = GetFFD(tab)
+                    if not td.foreverCornerMask then
+                        td.foreverCornerMask = tab:CreateMaskTexture()
+                        td.foreverCornerMask:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\portraits\\csquare_mask.tga", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+                        -- Both 128px assets have 10px transparent padding. Trim
+                        -- only the mask/border padding, never the icon's UVs.
+                        td.foreverCornerMask:SetTexCoord(10/128, 118/128, 10/128, 118/128)
+                    end
+                    td.foreverCornerMask:SetAllPoints(icon)
+                    if td.foreverMaskedIcon ~= icon then
+                        icon:AddMaskTexture(td.foreverCornerMask)
+                        td.foreverMaskedIcon = icon
+                    end
+                    local overlay = tab.IconOverlay
+                    if overlay and overlay.AddMaskTexture and td.foreverMaskedOverlay ~= overlay then
+                        overlay:AddMaskTexture(td.foreverCornerMask)
+                        td.foreverMaskedOverlay = overlay
+                    end
+                    local highlight = tab.GetHighlightTexture and tab:GetHighlightTexture()
+                    for _, outline in pairs({ checked, highlight }) do
+                        outline:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\portraits\\csquare_border.tga")
+                        outline:SetTexCoord(10/128, 118/128, 10/128, 118/128)
+                        outline:ClearAllPoints()
+                        outline:SetAllPoints(icon)
+                        -- Native CheckButton/hover code still owns visibility,
+                        -- alpha, blend mode and checked/disabled state.
+                    end
+                end
+                -- RightSideTabTemplate's anonymous BORDER texture is only a
+                -- decorative backing. Match that exact asset, never sweep the
+                -- icon, checked/hover artwork or notification regions.
+                local backing = "Interface\\SpellBook\\SpellBook-SkillLineTab"
+                local backingID = GetFileIDFromPath and GetFileIDFromPath(backing)
+                if tab.GetRegions then
+                    for _, region in ipairs({ tab:GetRegions() }) do
+                        if region ~= tab.Icon and region ~= tab.IconOverlay and region ~= checked
+                           and region.GetTexture and region.GetDrawLayer and region:GetDrawLayer() == "BORDER" then
+                            local texture = region:GetTexture()
+                            if not (issecretvalue and issecretvalue(texture)) then
+                                if (type(texture) == "string" and texture:gsub("/", "\\"):lower() == backing:lower())
+                                   or (backingID and texture == backingID) then region:SetAlpha(0) end
+                            end
+                        end
+                    end
+                end
+            else
             SquareTabIcon(tab)
             local icon = tab.Icon
             local td = GetFFD(tab)
@@ -2785,10 +2867,11 @@ local function Skin_Guild()
                     tab:SetPoint(p, rel, rp, x or 0, (y or 0) + 10)
                 end
             end
+            end
         end
     end
     local chat = f.ChatTab
-    if chat and not GetFFD(chat).rooted then
+    if not EUI_FOREVER and chat and not GetFFD(chat).rooted then
         GetFFD(chat).rooted = true
         chat:ClearAllPoints()
         chat:SetPoint("TOPLEFT", f, "TOPRIGHT", 1, -36)
@@ -3279,7 +3362,7 @@ local function Skin_Guild()
                 WSkin.Register(sec, true)
                 if sec.Bg and sec.Bg.SetAlpha then sec.Bg:SetAlpha(0) end
                 if sec.TitleText then WSkin.Font(sec.TitleText); WSkin.White(sec.TitleText) end
-                if sec.ScrollBar then WSkin.ScrollBar(sec.ScrollBar) end
+                if sec.ScrollBar then ns.GuildScrollBar(sec.ScrollBar) end
                 local sbx3 = sec.ScrollBox
                 if sbx3 and sbx3.ForEachFrame then
                     pcall(sbx3.ForEachFrame, sbx3, SkinBenefitRow)
@@ -3420,7 +3503,7 @@ local function Skin_Guild()
             WSkin.Font(tt)
             WSkin.White(tt)
         end
-        WSkin.ScrollBarsIn(gl)
+        ns.GuildScrollBarsIn(gl)
         -- Old-style scrollbar: arrows faded, thumb -> 4px house strip.
         local sb = _G[n .. "ScrollFrameScrollBar"]
         if sb and not GetFFD(sb).slim then
@@ -3554,9 +3637,9 @@ local function Skin_Guild()
             WSkin.FadeRegions(sub, keepSub)
             WSkin.Register(sub, true)
             if sub.TitleText then WSkin.Font(sub.TitleText); WSkin.White(sub.TitleText) end
-            if sub.ScrollBar then WSkin.ScrollBar(sub.ScrollBar) end
+            if sub.ScrollBar then ns.GuildScrollBar(sub.ScrollBar) end
             if sub.DetailsFrame and sub.DetailsFrame.ScrollBar then
-                WSkin.ScrollBar(sub.DetailsFrame.ScrollBar)
+                ns.GuildScrollBar(sub.DetailsFrame.ScrollBar)
             end
         end
     end
@@ -3614,7 +3697,7 @@ local function Skin_Guild()
         -- on the enabled state: it can be secret under forced restrictions.
         for _, key in ipairs(GUILD_TAB_KEYS) do
             local tab = f[key]
-            if tab then tab:SetAlphaFromBoolean(tab:IsEnabled(), 1, 0.5) end
+            if tab and not EUI_FOREVER then tab:SetAlphaFromBoolean(tab:IsEnabled(), 1, 0.5) end
         end
         WSkin.Restrip("guild")
         -- The guild tabs are display-mode buttons, not PanelTemplates tabs, so
@@ -4166,6 +4249,7 @@ end
 local _achSummaryHook = false
 local _achCritHook = false
 local function Skin_Achievements()
+    if EUI_FOREVER then return end -- Legacy has its own pages and skin.
     local f = _G.AchievementFrame
     if not f then return end
     -- Frame rect extends above the visible panel (floating points header), so
@@ -5447,6 +5531,10 @@ local function HookRCScrollBox(box, isCurrency)
 end
 
 local function Skin_RepCurrency()
+    if EUI_FOREVER then return end -- Camelot hosts these inside the six-mode character pane.
+    -- Stock character sheet styles (Style page) keep Blizzard's whole sheet,
+    -- these tabs included.
+    if ns.CharSheetStock and ns.CharSheetStock() then return end
     local rep = _G.ReputationFrame
     if rep then
         if rep.filterDropdown then WSkin.Dropdown(rep.filterDropdown) end
@@ -6389,9 +6477,78 @@ end
 local function Skin_WorldMap()
     local f = _G.WorldMapFrame
     if not f then return end
+    local function MapScrollBar(bar)
+        if not bar then return end
+        local arrows = {}
+        if EUI_FOREVER then
+            for _, key in ipairs({ "Back", "Forward" }) do
+                local button = bar[key]
+                if button and button.Texture then
+                    arrows[#arrows + 1] = { button.Texture, button.Texture:GetAlpha() }
+                end
+            end
+        end
+        WSkin.ScrollBar(bar)
+        for _, arrow in ipairs(arrows) do arrow[1]:SetAlpha(arrow[2]) end
+    end
+    local function ForeverMapControl(control)
+        if not control then return end
+        local d = GetFFD(control)
+        if not d.bg then
+            d.bg = SolidTex(control, "BACKGROUND", Theme.bgR, Theme.bgG, Theme.bgB, Theme.bgA)
+            d.bg:SetAllPoints(control)
+        end
+        d.bg:SetAlpha(1)
+        WSkin.AddBorder(control)
+        -- Keep native cog/arrow/reset glyphs and every dropdown handler.
+        WSkin.Font(control.Text)
+    end
+    local function ForeverQuestObjective(objective)
+        WSkin.Font(objective)
+        if not objective or not objective.GetTextColor then return end
+        local r, g, b = objective:GetTextColor()
+        local function PlainNumber(value)
+            return not (issecretvalue and issecretvalue(value)) and type(value) == "number"
+        end
+        if not (PlainNumber(r) and PlainNumber(g) and PlainNumber(b)) then return end
+        local function RGB(color)
+            if not color then return end
+            if color.GetRGB then return color:GetRGB() end
+            return color[1], color[2], color[3]
+        end
+        local function Matches(color)
+            local cr, cg, cb = RGB(color)
+            return PlainNumber(cr) and PlainNumber(cg) and PlainNumber(cb)
+                and math.abs(r - cr) < .0001 and math.abs(g - cg) < .0001 and math.abs(b - cb) < .0001
+        end
+        local function Use(color)
+            local cr, cg, cb = RGB(color)
+            if PlainNumber(cr) and PlainNumber(cg) and PlainNumber(cb) then
+                objective:SetTextColor(cr, cg, cb)
+            end
+        end
+        -- Translate only Blizzard's known material/status colors for our dark
+        -- pane. Unknown warning/session colors remain authoritative. Recycled
+        -- objectives are classified from their current native color each pass.
+        local completed = _G.QUEST_OBJECTIVE_COMPLETED_FONT_COLOR
+        local completedLight = _G.QUEST_OBJECTIVE_COMPLETED_FONT_COLOR_DARK_BACKGROUND
+        if Matches(completed) or Matches(completedLight) then
+            Use(completedLight)
+        elseif GetMaterialTextColors then
+            local defaultBody = GetMaterialTextColors("Default")
+            if Matches(defaultBody) then
+                local lightBody = GetMaterialTextColors("Stone")
+                Use(lightBody)
+            end
+        end
+    end
     -- Style-aware shell like every other window: canvas covers the middle, but
     -- quest log flank/top bar/borders show it, and the eui/Modern swap follows the style dropdown.
     WSkin.Shell("worldmap", f)
+
+    if EUI_FOREVER then
+        ForeverMapControl(f.WorldMapTrackingOptionsButton)
+    end
 
     WSkin.RemovePortrait(f)
     local bf = f.BorderFrame
@@ -6607,10 +6764,36 @@ local function Skin_WorldMap()
                 if sh.Divider then sh.Divider:SetAlpha(0) end
             end
             if qs.SearchBox then WSkin.EditBox(qs.SearchBox) end
-            if qs.ScrollBar then WSkin.ScrollBar(qs.ScrollBar) end
+            MapScrollBar(qs.ScrollBar)
+            if EUI_FOREVER then
+                ForeverMapControl(qs.SettingsDropdown)
+                local count = _G.QuestLogCount
+                if count then
+                    for _, key in ipairs({ "Left", "Middle", "Right" }) do
+                        if count[key] then count[key]:SetAlpha(0) end
+                    end
+                    ForeverMapControl(count)
+                end
+                -- Camelot uses red inline text above the native quest cap.
+                WSkin.Font(_G.QuestLogQuestCount)
+            end
             -- Collapsible section headers: pooled, re-skinned on every quest
             -- log update.
             local function SkinQuestHeaders()
+                if EUI_FOREVER then
+                    for _, poolKey in ipairs({ "titleFramePool", "objectiveFramePool" }) do
+                        local pool = qs[poolKey]
+                        if pool and pool.EnumerateActive then
+                            for row in pool:EnumerateActive() do
+                                -- Retain [level+], elite tags, completion/session
+                                -- colors and all native tracking/POI controls.
+                                WSkin.Font(row.Text)
+                                WSkin.Font(row.TagText)
+                                WSkin.Font(row.Dash)
+                            end
+                        end
+                    end
+                end
                 for _, poolKey in ipairs({ "headerFramePool",
                                            "campaignHeaderFramePool",
                                            "campaignHeaderMinimalFramePool" }) do
@@ -6701,7 +6884,9 @@ local function Skin_WorldMap()
             end
             -- Quest detail text: section headers (title / description /
             -- objectives / rewards) = quest yellow; body text + pooled
-            -- objective lines = white. Re-applied per map quest display.
+            -- objective lines = white on Retail. Forever translates known
+            -- objective colors for dark backgrounds while retaining status.
+            -- Re-applied per map quest display.
             local function StyleQuestText()
                 for _, n in ipairs({ "QuestInfoTitleHeader", "QuestInfoDescriptionHeader",
                                      "QuestInfoObjectivesHeader" }) do
@@ -6769,7 +6954,11 @@ local function Skin_WorldMap()
                 local of = _G.QuestInfoObjectivesFrame
                 if of and of.Objectives then
                     for _, obj in ipairs(of.Objectives) do
-                        if obj and obj.SetTextColor then obj:SetTextColor(1, 1, 1) end
+                        if EUI_FOREVER then
+                            ForeverQuestObjective(obj)
+                        elseif obj and obj.SetTextColor then
+                            obj:SetTextColor(1, 1, 1)
+                        end
                     end
                 end
             end
@@ -6795,7 +6984,7 @@ local function Skin_WorldMap()
             if qm:IsShown() then StyleQuestText() end
         end
         local dsf = _G.QuestMapDetailsScrollFrame
-        if dsf and dsf.ScrollBar then WSkin.ScrollBar(dsf.ScrollBar) end
+        if dsf then MapScrollBar(dsf.ScrollBar) end
 
         local co = qm.QuestsFrame and qm.QuestsFrame.CampaignOverview
         if co then
@@ -6803,7 +6992,7 @@ local function Skin_WorldMap()
             WSkin.FadeRegions(co)
             WSkin.Register(co, true)
             if co.ScrollFrame and co.ScrollFrame.ScrollBar then
-                WSkin.ScrollBar(co.ScrollFrame.ScrollBar)
+                MapScrollBar(co.ScrollFrame.ScrollBar)
             end
         end
 
@@ -6813,6 +7002,9 @@ local function Skin_WorldMap()
         end
 
         -- 11.1 side tabs (quests / events / map legend)
+        -- Camelot explicitly hides all three; do not skin/re-seat these native
+        -- hidden controls or attach Retail layout hooks to QuestMapFrame.
+        if not EUI_FOREVER then
         for _, k in ipairs({ "QuestsTab", "EventsTab", "MapLegendTab" }) do
             SkinMapSideTab(qm[k])
         end
@@ -6870,6 +7062,7 @@ local function Skin_WorldMap()
                 end
             end)
         end
+        end
 
         local ev = qm.EventsFrame
         if ev then
@@ -6879,7 +7072,7 @@ local function Skin_WorldMap()
             if ev.TitleText then WSkin.Font(ev.TitleText); WSkin.White(ev.TitleText) end
             if ev.BorderFrame then ev.BorderFrame:SetAlpha(0) end
             if ev.ScrollBox and ev.ScrollBox.Background then ev.ScrollBox.Background:SetAlpha(0) end
-            if ev.ScrollBar then WSkin.ScrollBar(ev.ScrollBar) end
+            MapScrollBar(ev.ScrollBar)
             -- Row styling via the acquired-frame callback: headers get the
             -- house plate + white label, event tiles the flat white hover.
             if ev.ScrollBox and _G.ScrollUtil
@@ -6921,7 +7114,7 @@ local function Skin_WorldMap()
             if mls then
                 if mls.Background then mls.Background:SetAlpha(0) end
                 if mls.Center then mls.Center:SetAlpha(0) end
-                if mls.ScrollBar then WSkin.ScrollBar(mls.ScrollBar) end
+                MapScrollBar(mls.ScrollBar)
             end
         end
     end
@@ -7019,6 +7212,10 @@ local function Skin_MicroMenu()
     end
 end
 
+-- WoW Forever keeps Blizzard's micro menu art (user decision): the pack is not
+-- registered there, so nothing above runs and the UpdateMicroButtons hook is
+-- never installed. The options card is dropped on that client to match.
+if not EllesmereUI.IS_FOREVER then
 WSkin.RegisterWindow({
     key = "micromenu",
     apply = function()
@@ -7035,6 +7232,7 @@ WSkin.RegisterWindow({
         pcall(Skin_MicroMenu)
     end,
 })
+end -- not IS_FOREVER
 
 -------------------------------------------------------------------------------
 --  Dressing Room (DressUpFrame). Chrome + action buttons; the 3D model scene
@@ -7928,8 +8126,8 @@ local function UpdateMerchantItemLevels()
                     else
                         fs:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
                     end
-                    local path = (EllesmereUI.GetFontPath and EllesmereUI.GetFontPath()) or "Fonts\\FRIZQT__.TTF"
-                    local flag = (EllesmereUI.SlugFlag and EllesmereUI.SlugFlag("OUTLINE, SLUG")) or "OUTLINE"
+                    local path = (EllesmereUI.GetFontPath()) or "Fonts\\FRIZQT__.TTF"
+                    local flag = (EllesmereUI.SlugFlag("OUTLINE, SLUG")) or "OUTLINE"
                     fs:SetFont(path, 12, flag)
                     GetFFD(btn).merchantILvl = fs
                 end
@@ -7943,14 +8141,8 @@ local function UpdateMerchantItemLevels()
                         if ilvl and ilvl > 0 then
                             fs:SetText(ilvl)
                             local quality = select(3, C_Item.GetItemInfo(link))
-                            local r, g, b = 1, 1, 1
-                            if EllesmereUI.GetItemLevelColor then
-                                local c = EllesmereUI.GetItemLevelColor(link, quality)
-                                if c then r, g, b = c.r or 1, c.g or 1, c.b or 1 end
-                            elseif quality then
-                                r, g, b = C_Item.GetItemQualityColor(quality)
-                            end
-                            fs:SetTextColor(r, g, b, 1)
+                            local c = EllesmereUI.GetItemLevelColor(link, quality)
+                            fs:SetTextColor(c.r or 1, c.g or 1, c.b or 1, 1)
                         end
                     end
                 end
@@ -8687,7 +8879,16 @@ local function Skin_AuctionHouse()
     -- (<name>Left/Middle/Right), which the engine's keyed fade misses, so it sits over our fill and reads unskinned.
     local function MoneyBox(eb)
         if not eb then return end
+        -- Large sell inputs use Icon; native bid inputs use texture. These
+        -- regions identify the denomination, including Forever copper values.
+        -- Preserve alpha and native colorblind-mode Show/Hide independently.
+        local coin = eb.Icon or eb.texture
+        local coinAlpha = coin and coin:GetAlpha()
         WSkin.EditBox(eb)
+        if coin then
+            coin:SetAlpha(coinAlpha)
+            WSkin.Register(eb, { [coin] = true })
+        end
         local n = eb.GetName and eb:GetName()
         if n then
             for _, suf in ipairs({ "Left", "Middle", "Right" }) do
@@ -8698,8 +8899,20 @@ local function Skin_AuctionHouse()
     end
     local function MoneyInputs(mi)
         if not mi then return end
-        MoneyBox(mi.GoldBox)
-        MoneyBox(mi.SilverBox)
+        MoneyBox(mi.GoldBox or mi.gold)
+        MoneyBox(mi.SilverBox or mi.silver)
+        MoneyBox(mi.CopperBox or mi.copper)
+    end
+    local function ScrollBars(host)
+        WSkin.ScrollBarsIn(host)
+        -- Native MinimalScrollBar stepper textures carry enabled/hover/pressed
+        -- states. Keep those controls visible beside the EUI thumb treatment.
+        local bar = host and host.ScrollBar
+        if not bar then return end
+        for _, key in ipairs({ "Back", "Forward" }) do
+            local stepper = bar[key]
+            if stepper and stepper.Texture then stepper.Texture:SetAlpha(1) end
+        end
     end
     -- Click-to-sort column headers, guild-roster treatment: 3-slice art
     -- cleared, flat plate, white label, standard hover. Headers pool/rebuild per list refresh, re-runs from RefreshScrollFrame hook.
@@ -8769,7 +8982,11 @@ local function Skin_AuctionHouse()
                         local t2 = col[k2]
                         if t2 and t2.SetTexture then t2:SetTexture("") end
                     end
-                    WSkin.FadeRegions(col)
+                    -- Arrow is native sort direction, not header chrome.
+                    -- SetArrowState only changes Show/Hide and UVs, so fading
+                    -- alpha here would permanently erase its indication.
+                    local keep = col.Arrow and { [col.Arrow] = true } or nil
+                    WSkin.FadeRegions(col, keep)
                     -- Invisible plate: the full-width sort strip is the row's
                     -- ONE background (a filled plate would STACK on the 50%
                     -- strip and read darker wherever a column sits). The
@@ -8781,7 +8998,7 @@ local function Skin_AuctionHouse()
                     local hov = SolidTex(col, "HIGHLIGHT", 1, 1, 1, 0.1)
                     hov:SetAllPoints(col)
                     hd.hover = hov
-                    WSkin.Register(col, true)
+                    WSkin.Register(col, keep or true)
                 end
                 local fs = col.GetFontString and col:GetFontString()
                 if fs then WSkin.White(fs) end
@@ -8840,7 +9057,7 @@ local function Skin_AuctionHouse()
         WSkin.FadeRegions(list, ld.strip and { [ld.strip] = true } or nil)
         if list.NineSlice then WSkin.FadeNineSlice(list.NineSlice) end
         WSkin.Register(list, true)
-        WSkin.ScrollBarsIn(list)
+        ScrollBars(list)
         SkinRefresh(list.RefreshFrame)
         if hasHeader then
             Headers(list)
@@ -8891,6 +9108,7 @@ local function Skin_AuctionHouse()
                 MoneyInputs(mi)
                 SlimInput(mi.GoldBox)
                 SlimInput(mi.SilverBox)
+                SlimInput(mi.CopperBox)
             end
         end
         if sf.Duration and sf.Duration.Dropdown then WSkin.Dropdown(sf.Duration.Dropdown) end
@@ -8966,7 +9184,7 @@ local function Skin_AuctionHouse()
         WSkin.FadeRegions(cats)
         if cats.NineSlice then WSkin.FadeNineSlice(cats.NineSlice) end
         WSkin.Register(cats, true)
-        WSkin.ScrollBarsIn(cats)
+        ScrollBars(cats)
         if not GetFFD(cats).topShift then
             local np = cats:GetNumPoints() or 0
             local pts, ok = {}, np > 0
@@ -9186,8 +9404,11 @@ local function Skin_AuctionHouse()
         List(ibf.ItemList, true)
     end
     local function ReFadeMoney()
+        MoneyInputs(ibf and ibf.BidFrame and ibf.BidFrame.BidAmount)
+        local auctions = f.AuctionsFrame or _G.AuctionHouseFrameAuctionsFrame
+        MoneyInputs(auctions and auctions.BidFrame and auctions.BidFrame.BidAmount)
         for _, n in ipairs({ "AuctionHouseFrameGold", "AuctionHouseFrameSilver",
-                             "BidAmountGold", "BidAmountSilver" }) do
+                             "AuctionHouseFrameCopper", "BidAmountGold", "BidAmountSilver", "BidAmountCopper" }) do
             MoneyBox(_G[n])
         end
     end
@@ -9223,6 +9444,7 @@ local function Skin_AuctionHouse()
             WSkin.FadeRegions(tsf.DummyItemList)
             WSkin.Register(tsf.DummyItemList, true)
             WSkin.ScrollBarsIn(tsf)
+            ScrollBars(tsf.DummyItemList)
         end
     end
 
@@ -11552,6 +11774,10 @@ end
 function SP.Apply()
     local f = _G.SocialUIFrame
     if not f then return end
+    -- The Friends List stock styles (Style page) keep Blizzard's whole Social
+    -- window, its frame included; the Window Skins card is blocked meanwhile.
+    local fr = EllesmereUI._ModuleNS and EllesmereUI._ModuleNS.EllesmereUIFriends
+    if fr and fr.FR_Style and fr.FR_Style() ~= "eui" then return end
 
     WSkin.Shell("socialui", f)
     WSkin.RemovePortrait(f)

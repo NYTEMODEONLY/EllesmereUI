@@ -199,7 +199,7 @@ local _sfFile, _sfSize, _sfFlags
 local function ApplySubtitleFont()
     local file = GetFont()
     local size = GetSubTextSize()
-    local flags = (EllesmereUI and EllesmereUI.SlugFlag and EllesmereUI.SlugFlag("OUTLINE, SLUG")) or "OUTLINE, SLUG"
+    local flags = (EllesmereUI.SlugFlag("OUTLINE, SLUG")) or "OUTLINE, SLUG"
     if file == _sfFile and size == _sfSize and flags == _sfFlags then return end
     _sfFile, _sfSize, _sfFlags = file, size, flags
     subtitleFont:SetFont(file, size, flags)
@@ -232,13 +232,27 @@ local function ApplyFriendlyFontOverride(force)
         end
         fontOverrideApplied = false
     end
+    -- Blizzard picks the name's font object by Nameplate Style: Modern/Block
+    -- anchor the name inside the bar and use _Outlined (stock NORMAL outline),
+    -- Classic anchors it above and uses the plain object (stock SLUG only), so
+    -- Classic-style users got name-only player names with no outline at all.
+    -- Friendly names are always outlined (the full plates force it), so the
+    -- one thing added here is OUTLINE where the object's own flags lack one.
+    -- Everything else the object carries (SLUG, an outline already present)
+    -- stays exactly as read, so already-outlined names render unchanged.
+    local function WithOutline(flags)
+        flags = flags or ""
+        if flags:find("OUTLINE", 1, true) then return flags end
+        if flags == "" then return "OUTLINE" end
+        return flags .. ", OUTLINE"
+    end
     if SystemFont_NamePlate and SystemFont_NamePlate.SetFont then
         local _, _, flags = SystemFont_NamePlate:GetFont()
-        SystemFont_NamePlate:SetFont(font, size, flags or GetNPOutline())
+        SystemFont_NamePlate:SetFont(font, size, WithOutline(flags))
     end
     if SystemFont_NamePlate_Outlined and SystemFont_NamePlate_Outlined.SetFont then
         local _, _, flags = SystemFont_NamePlate_Outlined:GetFont()
-        SystemFont_NamePlate_Outlined:SetFont(font, size, flags or GetNPOutline())
+        SystemFont_NamePlate_Outlined:SetFont(font, size, WithOutline(flags))
     end
     _ffFile, _ffSize = font, size
     fontOverrideApplied = true
@@ -341,11 +355,6 @@ local function EnsureNameUnconstrained(nameFS)
     if nameFS.SetTextHeight then hooksecurefunc(nameFS, "SetTextHeight", ApplyNameTextHeight) end
 end
 
-local function ApplyFontToNameplate(nameplate)
-    -- No-op: font is applied globally via the SystemFont_NamePlate override.
-end
-ns.ApplyFontToNameplate = ApplyFontToNameplate
-
 -- Exposed so the options panel can live-apply a new friendly name-only size.
 -- Re-running the override re-reads GetFriendlyNameSize and resizes the shared
 -- font object; the name FontStrings inherit it on the next render.
@@ -387,19 +396,6 @@ local function ScheduleNameSizeReapply(force)
         -- the existing debounce, so a burst costs one sweep.
         if ReanchorAllPlayerNames then ReanchorAllPlayerNames() end
     end)
-end
-
--- Exposed so the options panel can trigger a refresh after font changes
-function ns.RefreshFriendlyFontOverride()
-    if IsNameOnlyMode() then
-        -- Re-style all currently visible friendly nameplates
-        for i, nameplate in ipairs(C_NamePlate.GetNamePlates(true)) do
-            local unit = nameplate.namePlateUnitToken
-            if unit and not UnitCanAttack("player", unit) and not UnitIsUnit(unit, "player") then
-                ApplyFontToNameplate(nameplate)
-            end
-        end
-    end
 end
 
 -------------------------------------------------------------------------------
@@ -584,21 +580,72 @@ function ns.RefreshNPCOverlayStyle()
 end
 
 -------------------------------------------------------------------------------
+--  Class colours: the friendly bar, the name and the guild line
+-------------------------------------------------------------------------------
+-- The unit's class colour on the suite palette (custom class colours and Class
+-- Color Darken). Returns ok, r, g, b. A redacted class token takes the
+-- restricted-unit palette, else Blizzard's class colour; those r/g/b may be
+-- secret, so they only ever reach a setter. plainOnly refuses a redacted token
+-- instead, for callers that need numbers they can do arithmetic on.
+local function ClassRGB(unit, plainOnly)
+    local _, tok = UnitClass(unit)
+    if issecretvalue(tok) then
+        if plainOnly then return false end
+        local ok, r, g, b = EllesmereUI.GetClassColorForRestrictedUnit(unit, tok)
+        if ok then return true, r, g, b end
+        local c = C_ClassColor.GetClassColor(tok)
+        if c then return true, c:GetRGB() end
+        return false
+    end
+    if not tok then return false end
+    local c = EllesmereUI.GetClassColor(tok)
+    return true, c.r, c.g, c.b
+end
+
+-- Paints one full plate's bar and name. Players: the bar takes the class colour
+-- (Class Colored Health Bar) or friendlyBarColor, the name the class colour
+-- (Class Colored Names) or white; with Class Colored Health Bar on, a class that
+-- does not resolve paints both in the NPC colour. NPCs take the NPC colour. One
+-- UnitClass read at most.
+local function PaintFriendlyColors(plate, unit, fp)
+    if UnitIsPlayer(unit) then
+        local useClass = not fp or fp.classColorFriendly ~= false
+        local nameClass = fp and fp.friendlyNameClassColor
+        local ok, r, g, b
+        if useClass or nameClass then ok, r, g, b = ClassRGB(unit) end
+        if ok or not useClass then
+            if useClass then
+                plate.health:SetStatusBarColor(r, g, b)
+            else
+                local bc = (fp and fp.friendlyBarColor) or ns.defaults.friendlyBarColor
+                plate.health:SetStatusBarColor(bc.r, bc.g, bc.b)
+            end
+            if nameClass and ok then
+                plate.name:SetTextColor(r, g, b)
+            else
+                plate.name:SetTextColor(1, 1, 1)
+            end
+            return
+        end
+    end
+    local nr, ng, nb = GetFriendlyNPCColor()
+    plate.health:SetStatusBarColor(nr, ng, nb)
+    plate.name:SetTextColor(nr, ng, nb)
+end
+
+-------------------------------------------------------------------------------
 --  Below Name sub text: data + rendering (shared by both friendly modes)
 -------------------------------------------------------------------------------
 local SUB_TEXT_R, SUB_TEXT_G, SUB_TEXT_B = 0.8, 0.8, 0.8
 
 -- Effective sub text color: the unit's class color when Class Colored is
--- picked (a secret class token falls back to custom), else the custom color.
+-- picked (a secret class token falls back to custom: name-only mode builds a
+-- colour escape from these numbers), else the custom color.
 local function GetSubTextColor(unit)
     local fp = FP()
     if fp and fp.friendlyBelowNameClassColor then
-        local _, classToken = UnitClass(unit)
-        if classToken and not (issecretvalue and issecretvalue(classToken))
-            and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classToken] then
-            local cc = RAID_CLASS_COLORS[classToken]
-            return cc.r, cc.g, cc.b
-        end
+        local ok, r, g, b = ClassRGB(unit, true)
+        if ok then return r, g, b end
     end
     local c = fp and fp.friendlyBelowNameColor
     if c then return c.r or SUB_TEXT_R, c.g or SUB_TEXT_G, c.b or SUB_TEXT_B end
@@ -670,8 +717,17 @@ local _titledNameGuard = false
 -- Compose and write the full name-only string: name (+ inline title) plus an
 -- optional second line for the guild. Also the restore path -- with the
 -- Subtitle Text setting off this resolves to the plain single-line name.
+local function ForeverFriendlyUnitAccessible(unit)
+    if not EUI_FOREVER then return true end
+    if issecretvalue and issecretvalue(unit) then return false end
+    if not unit then return false end
+    local exists, hostile, player, self = UnitExists(unit), UnitCanAttack("player", unit), UnitIsPlayer(unit), UnitIsUnit(unit, "player")
+    if issecretvalue and (issecretvalue(exists) or issecretvalue(hostile) or issecretvalue(player) or issecretvalue(self)) then return false end
+    return exists and not hostile and not self
+end
 local function UpdateNameOnlyText(nameFS)
     local unit = nameFSUnits[nameFS]
+    if not ForeverFriendlyUnitAccessible(unit) then return end
     if not unit or not UnitExists(unit) then return end
     -- Nameplate tokens are recycled: a plate reused for an enemy keeps our
     -- hook and a stale friendly token, so never write on a hostile unit
@@ -682,7 +738,7 @@ local function UpdateNameOnlyText(nameFS)
 
     local want
     if ModeHasTitle(mode) and isPlayer then want = GetTitledName(unit) end
-    if not want then want = UnitName(unit) end
+    if not want then want = EllesmereUI.WithSurname(UnitName(unit)) end
     if not want or (issecretvalue and issecretvalue(want)) then return end
 
     local guild
@@ -695,7 +751,7 @@ local function UpdateNameOnlyText(nameFS)
     -- rather than the next hook fire, which is a fair trade for never
     -- touching a secret with ==.
     local guildKey = guild
-    if guildKey ~= nil and issecretvalue and issecretvalue(guildKey) then guildKey = true end
+    if issecretvalue and issecretvalue(guildKey) then guildKey = true end
     local st = nameFSText[nameFS]
     if st and st.name == want and st.guild == guildKey then return end
     if not st then st = {}; nameFSText[nameFS] = st end
@@ -729,6 +785,8 @@ end
 -- composition survives Blizzard's own name updates. The hook body is a
 -- single field read while the feature is off.
 local function AttachNameOnlyText(nameFS, unit)
+    if not ForeverFriendlyUnitAccessible(unit) then return end
+    if EUI_FOREVER and nameFS.IsForbidden and nameFS:IsForbidden() then return end
     -- Pair the width clear with the (longer) text write: a titled name must
     -- never hit a leftover constraint and ellipsize.
     EnsureNameUnconstrained(nameFS)
@@ -759,9 +817,9 @@ local function SweepPlayerSubText()
     local pending = ns.pendingUnits
     if not pending then return end
     for unit, nameplate in pairs(pending) do
-        if UnitIsPlayer(unit) and not UnitIsUnit(unit, "player") and not UnitCanAttack("player", unit) then
+        if ForeverFriendlyUnitAccessible(unit) and UnitIsPlayer(unit) and not UnitIsUnit(unit, "player") and not UnitCanAttack("player", unit) then
             local uf = nameplate.UnitFrame
-            if uf and uf.name then
+            if uf and not (EUI_FOREVER and uf:IsForbidden()) and uf.name then
                 -- Settings changed under us, so drop the dedupe first.
                 nameFSText[uf.name] = nil
                 AttachNameOnlyText(uf.name, unit)
@@ -778,9 +836,9 @@ function ReanchorAllPlayerNames()
     local pending = ns.pendingUnits
     if not pending then return end
     for unit, nameplate in pairs(pending) do
-        if UnitIsPlayer(unit) and not UnitCanAttack("player", unit) and not UnitIsUnit(unit, "player") then
+        if ForeverFriendlyUnitAccessible(unit) and UnitIsPlayer(unit) and not UnitCanAttack("player", unit) and not UnitIsUnit(unit, "player") then
             local uf = nameplate.UnitFrame
-            if uf and uf.name then
+            if uf and not (EUI_FOREVER and uf:IsForbidden()) and uf.name then
                 FixNameSizing(uf.name)
                 ApplyNameTextHeight(uf.name)
             end
@@ -901,6 +959,7 @@ end
 --  NAME_PLATE_UNIT_ADDED reaches any addon event handler.
 -------------------------------------------------------------------------------
 hooksecurefunc(NamePlateDriverFrame, "OnNamePlateAdded", function(_, unit)
+    if not ForeverFriendlyUnitAccessible(unit) then return end
     if not unit or unit == "preview" then return end
     if UnitCanAttack("player", unit) then return end
     if UnitIsUnit(unit, "player") then return end
@@ -938,7 +997,7 @@ hooksecurefunc(NamePlateDriverFrame, "OnNamePlateAdded", function(_, unit)
     -- name FontString so long names are never truncated with "...".
     if IsNameOnlyMode() and UnitIsPlayer(unit) then
         local nameplate = C_NamePlate.GetNamePlateForUnit(unit)
-        if nameplate and nameplate.UnitFrame and nameplate.UnitFrame.name then
+        if nameplate and nameplate.UnitFrame and not (EUI_FOREVER and nameplate.UnitFrame:IsForbidden()) and nameplate.UnitFrame.name then
             -- Name-only player plates render ONLY the name, but Blizzard's
             -- CompactUnitFrame keeps its full ~47-event surface live behind
             -- every one of them (incl. UNIT_AURA and UPDATE_MOUSEOVER_UNIT).
@@ -947,7 +1006,9 @@ hooksecurefunc(NamePlateDriverFrame, "OnNamePlateAdded", function(_, unit)
             -- the plate's next occupant, and the name-only mode toggle writes
             -- nameplate CVars, which trigger the driver's own full re-setup.
             local uf = nameplate.UnitFrame
-            if not uf:IsForbidden() then
+            if not EUI_FOREVER and not uf:IsForbidden() then
+                -- Retail's event-pruning optimization assumes its complete
+                -- nameplate event surface. Keep Camelot's native events intact.
                 uf:UnregisterAllEvents()
                 uf:RegisterUnitEvent("UNIT_NAME_UPDATE", unit)
                 uf:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -992,7 +1053,8 @@ local friendlyFrameCache = CreateFramePool("Frame", UIParent, nil, nil, false, f
 
     plate.health = CreateFrame("StatusBar", nil, plate)
     plate.health:SetFrameLevel(10)
-    plate.health:SetPoint("CENTER", 0, FRIENDLY_PLATE_Y_OFFSET)
+    -- WoW Forever: shifted left so the bar and its level box centre on the unit.
+    plate.health:SetPoint("CENTER", -ns.NP_ForeverNameDX(plate), FRIENDLY_PLATE_Y_OFFSET)
     plate.health:SetSize(GetFriendlyHealthBarWidth(), GetFriendlyHealthBarHeight())
     plate.health:SetStatusBarTexture("Interface\\Buttons\\WHITE8x8")
 
@@ -1008,13 +1070,21 @@ local friendlyFrameCache = CreateFramePool("Frame", UIParent, nil, nil, false, f
     local PP = EllesmereUI and EllesmereUI.PP
     if PP and PP.CreateBorder then
         local cr, cg, cb = ns.GetBorderColor()
-        local sz = (FP() and FP().borderSize) or ns.defaults.borderSize
+        -- The classic plate's fixed 1px edge, else the friendly profile's own size.
+        local sz = ns.NP_Classic() and 1 or ((FP() and FP().borderSize) or ns.defaults.borderSize)
         PP.CreateBorder(plate.health, cr, cg, cb, 1, sz, "OVERLAY", 7, true)  -- scaleGuard: NP frame
-        if not ns.IsBorderEnabled() then PP.HideBorder(plate.health) end
+        if not ns.IsBorderEnabled() or ns.NP_Classic() then PP.HideBorder(plate.health) end
     end
 
     function plate:ApplyBorder()
         if not PP then return end
+        if ns.NP_Classic() then
+            -- Classic WoW UI: the vanilla border art replaces every EUI border.
+            PP.HideBorder(plate.health)
+            ns.HideCustomBorder(plate)
+            ns.NP_ApplyClassicHealthArt(plate, GetFriendlyHealthBarHeight())
+            return
+        end
         if ns.IsCustomBorderEnabled() then
             -- Custom border mirrors the enemy custom-border settings 1:1.
             PP.HideBorder(plate.health)
@@ -1022,13 +1092,14 @@ local friendlyFrameCache = CreateFramePool("Frame", UIParent, nil, nil, false, f
         else
             ns.HideCustomBorder(plate)
             if ns.IsBorderEnabled() then
-                local sz = (FP() and FP().borderSize) or ns.defaults.borderSize
-                PP.SetBorderSize(plate.health, sz)
+                PP.SetBorderSize(plate.health, ns.NP_Classic() and 1 or ((FP() and FP().borderSize) or ns.defaults.borderSize))
                 PP.ShowBorder(plate.health)
             else
                 PP.HideBorder(plate.health)
             end
         end
+        -- WoW Forever: the level box right of the bar, as on the enemy plates.
+        if ns._npForever then ns.NP_ApplyForeverLevelBox(plate, GetFriendlyHealthBarHeight()) end
     end
     function plate:ApplyBorderColor()
         if not PP then return end
@@ -1101,8 +1172,12 @@ local friendlyFrameCache = CreateFramePool("Frame", UIParent, nil, nil, false, f
     -- Forced crisp outline; SetFSFont applies the global "Never Show Slug" gate.
     SetFSFont(plate.hpText, 10, "OUTLINE, SLUG")
     plate.hpText:SetPoint("RIGHT", plate.health, -2, 0)
+    -- Blizzard Style: above the deselected overlay / ring (OVERLAY 4/5).
+    if ns.NP_Style and ns.NP_Style() == "blizzard" then plate.hpText:SetDrawLayer("OVERLAY", 7) end
 
-    plate.highlight = plate.health:CreateTexture(nil, "OVERLAY", nil, 6)
+    -- Blizzard Style: under the stock ring / deselected overlay (OVERLAY 4/5);
+    -- the EUI and classic looks keep it at 6.
+    plate.highlight = plate.health:CreateTexture(nil, "OVERLAY", nil, (ns.NP_Style and ns.NP_Style() == "blizzard") and 1 or 6)
     plate.highlight:SetAllPoints()
     local _hc = (FP() and FP().hoverColor) or ns.defaults.hoverColor
     local _ha = (FP() and FP().hoverAlpha) or ns.defaults.hoverAlpha
@@ -1190,6 +1265,7 @@ function FriendlyFrame:SetUnit(unit, nameplate)
     self:SetFrameLevel(nameplate:GetFrameLevel() + 1)
     self:Show()
 
+    -- (Classic WoW UI: the border art is seated by ApplyBorder below.)
     self.health:SetSize(GetFriendlyHealthBarWidth(), GetFriendlyHealthBarHeight())
 
     -- Suppress Blizzard UF via reparenting (immediate, no OnUpdate needed)
@@ -1198,37 +1274,21 @@ function FriendlyFrame:SetUnit(unit, nameplate)
     self:RegisterUnitEvent("UNIT_HEALTH", unit)
     self:RegisterUnitEvent("UNIT_NAME_UPDATE", unit)
 
-    local _fp = FP()
-    local useClassColor = not _fp or _fp.classColorFriendly ~= false
-    local classColor
-    if UnitIsPlayer(unit) then
-        if useClassColor then
-            local _, classToken = UnitClass(unit)
-            if classToken and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classToken] then
-                classColor = RAID_CLASS_COLORS[classToken]
-            end
-        else
-            local bc = (_fp and _fp.friendlyBarColor) or ns.defaults.friendlyBarColor
-            classColor = bc
-        end
-    end
-    if classColor then
-        self.health:SetStatusBarColor(classColor.r, classColor.g, classColor.b)
-        self.name:SetTextColor(1, 1, 1)
-    else
-        local nr, ng, nb = GetFriendlyNPCColor()
-        self.health:SetStatusBarColor(nr, ng, nb)
-        self.name:SetTextColor(nr, ng, nb)
-    end
+    PaintFriendlyColors(self, unit, FP())
 
     self:UpdateHealth()
     self:UpdateName()
     self:UpdateRaidIcon()
-    self:ApplyTarget()
+    ns.NP_FriendlyFactionRefresh(self)
     -- Re-apply the enemy border settings every spawn: a pooled plate may have
     -- been released while the user changed the border size/color/toggle.
     if self.ApplyBorder then self:ApplyBorder() end
     if self.ApplyBorderColor then self:ApplyBorderColor() end
+    -- The base border is back: a recycled plate's target/hover border flags are stale.
+    -- ApplyTarget runs after the pair so a plate that spawns as your target keeps the
+    -- Target Border Effects instead of losing them to the base repaint.
+    self._targetBorderSized, self._fxBorderTinted = nil, nil
+    self:ApplyTarget()
     if ns.ApplyHealthBarTexture then ns.ApplyHealthBarTexture(self) end
 end
 
@@ -1244,6 +1304,8 @@ function FriendlyFrame:ClearUnit()
     end
     -- Restore Blizzard UF before clearing our reference
     if self.unit then RestoreBlizzardUF(self.unit) end
+    -- Its faction badge lives on the nameplate, not on this frame.
+    ns.NP_FriendlyFactionHide(self)
     self.unit = nil
     self.nameplate = nil
     self.glow:Hide()
@@ -1292,7 +1354,7 @@ function FriendlyFrame:UpdateName()
     if ModeHasTitle(GetBelowNameMode()) and UnitIsPlayer(unit) then
         unitName = GetTitledName(unit)
     end
-    if not unitName then unitName = UnitName(unit) end
+    if not unitName then unitName = EllesmereUI.WithSurname(UnitName(unit)) end
     self.name:SetText(unitName or "")
     self:UpdateSubText()
 end
@@ -1326,10 +1388,12 @@ function FriendlyFrame:UpdateSubText()
         -- Both texts hang off the HEALTH BAR (a frame) with computed numbers:
         -- the name's bottom sits at off, so the guild line's top sits 1px
         -- under it. Chaining the line off the name's rect instead is what
-        -- made it jitter on moving plates.
-        self.name:SetPoint("BOTTOM", self.health, "TOP", 0, off)
+        -- made it jitter on moving plates. WoW Forever centres both over the
+        -- bar and its level box together.
+        local dx = ns.NP_ForeverNameDX(self)
+        self.name:SetPoint("BOTTOM", self.health, "TOP", dx, off)
         self.subText1:ClearAllPoints()
-        self.subText1:SetPoint("TOP", self.health, "TOP", 0, off - 1)
+        self.subText1:SetPoint("TOP", self.health, "TOP", dx, off - 1)
     end
 end
 
@@ -1347,9 +1411,11 @@ function FriendlyFrame:UpdateRaidIcon()
     if pos == "top" then
         self.raidFrame:SetPoint("BOTTOM", self.health, "TOP", 0, ns.GetDebuffYOffset())
     elseif pos == "left" then
-        self.raidFrame:SetPoint("RIGHT", self.health, "LEFT", -ns.GetSideAuraXOffset(), 0)
+        -- Classic WoW UI: gap off the border art (sized by the friendly bar's
+        -- own height), not the bare bar edge.
+        self.raidFrame:SetPoint("RIGHT", self.health, "LEFT", -(ns.GetSideAuraXOffset() + ns.NP_ClassicSide("left", GetFriendlyHealthBarHeight())), 0)
     elseif pos == "right" then
-        self.raidFrame:SetPoint("LEFT", self.health, "RIGHT", ns.GetSideAuraXOffset(), 0)
+        self.raidFrame:SetPoint("LEFT", self.health, "RIGHT", ns.GetSideAuraXOffset() + ns.NP_ClassicSide("right", GetFriendlyHealthBarHeight()), 0)
     elseif pos == "topleft" then
         -- Flush with the nameplate's left edge (PP borders inset -> bar corner is
         -- the outer edge; offset 0 = flush). Matches the enemy plate convention.
@@ -1378,6 +1444,46 @@ function FriendlyFrame:ApplyTarget()
     end
     self.leftArrow:SetShown(showArrows or false)
     self.rightArrow:SetShown(showArrows or false)
+    -- Blizzard Style: stock selection ring / deselected overlay on friendly plates too.
+    if ns.NP_Style and ns.NP_Style() == "blizzard" then ns.NP_ApplyBlizzSelection(self) end
+    -- Target Border Effects (friendlyTargetBorderFx, default off): the enemy plate's
+    -- target Border Size and Border Color channels, restored on untarget. The hover
+    -- effect's target-wins checks (ApplyHoverExtras) read _isTarget and
+    -- _targetBorderSized as on enemy plates; _isTarget is cached only while this
+    -- feature styles the plate; otherwise hover drives a friendly target's border. Off, only
+    -- a plate these flags mark is repainted (the hover Border Color restore included).
+    local fx = fp and fp.friendlyTargetBorderFx and isTarget or nil
+    self._isTarget = fx
+    if fx or self._targetBorderSized or self._fxBorderTinted then
+        local PP = EllesmereUI.PP
+        local tbsz
+        if fx and ns.GetTargetGlowBorderSize() then tbsz = ns.GetTargetBorderSizeValue() end
+        if tbsz then
+            if ns.IsCustomBorderEnabled() then
+                ns.ApplyCustomBorderStyle(self, tbsz)
+            elseif ns.IsBorderEnabled() then
+                PP.SetBorderSize(self.health, tbsz)
+            end
+            self._targetBorderSized = true
+        elseif self._targetBorderSized then
+            self._targetBorderSized = nil
+            self:ApplyBorder()
+        end
+        -- Colour after size: a rebuilt custom border takes the tint right after. A tint only.
+        if fx and ns.GetTargetGlowBorderColor() then
+            local bc = ns.GetTargetBorderColor()
+            if ns.IsCustomBorderEnabled() then
+                if not self._customBorder then ns.ApplyCustomBorderStyle(self) end
+                EllesmereUI.SetBorderStyleColor(self._customBorder, bc.r, bc.g, bc.b, 1)
+            else
+                PP.SetBorderColor(self.health, bc.r, bc.g, bc.b, 1)
+            end
+            self._fxBorderTinted = true
+        elseif self._fxBorderTinted then
+            self._fxBorderTinted = nil
+            self:ApplyBorderColor()
+        end
+    end
 end
 
 function FriendlyFrame:UNIT_HEALTH()  self:UpdateHealth() end
@@ -1461,6 +1567,8 @@ function ns.RemoveFriendlyPlateNoRestore(unit)
     end
     -- Clear modifiedUFs entry so the friendly SetAlpha hook stops interfering
     modifiedUFs[unit] = nil
+    -- Promoted to an enemy plate, which draws its own faction badge.
+    ns.NP_FriendlyFactionHide(plate)
     plate.unit = nil
     plate.nameplate = nil
     plate.glow:Hide()
@@ -1531,8 +1639,32 @@ end
 function ns.RefreshFriendlyPlateSize()
     local h = GetFriendlyHealthBarHeight()
     local w = GetFriendlyHealthBarWidth()
+    -- Classic WoW UI: the vanilla border scales with the bar, so it re-seats
+    -- with every size change (the seat memoizes, so an unchanged size is free).
+    local classic = ns.NP_Classic()
+    local forever = ns.NP_Forever()
     for _, plate in pairs(friendlyPlates) do
         plate.health:SetSize(w, h)
+        if classic then
+            ns.NP_ApplyClassicHealthArt(plate, h)
+            -- A side raid marker gaps off the border, which moved with it.
+            plate:UpdateRaidIcon()
+        elseif forever then
+            -- WoW Forever: the level box follows the bar's height.
+            ns.NP_ApplyForeverLevelBox(plate, h)
+        end
+    end
+end
+
+-- WoW Forever's Show Level Box flipped (ns.RefreshAllSettings): each shown
+-- friendly plate gains or parks its box, the bar and name re-centring with
+-- it, and a side raid marker re-gaps off the bar. A pooled plate catches up
+-- through its next ApplyBorder.
+function ns.NP_ForeverFriendlyBoxes()
+    local h = GetFriendlyHealthBarHeight()
+    for _, plate in pairs(friendlyPlates) do
+        ns.NP_ApplyForeverLevelBox(plate, h)
+        plate:UpdateRaidIcon()
     end
 end
 
@@ -1542,26 +1674,17 @@ function ns.RefreshFriendlyHealthText()
     end
 end
 
-function ns.RefreshFriendlyColors()
-    local _fp = FP()
-    local useClassColor = not _fp or _fp.classColorFriendly ~= false
-    local bc = (_fp and _fp.friendlyBarColor) or ns.defaults.friendlyBarColor
-    local nr, ng, nb = GetFriendlyNPCColor()
+-- Repaints every live full plate's bar and name (colour settings, the class
+-- palette, profile switches), the same way the spawn path paints them.
+-- paletteChanged: the class palette moved, so a Class Colored guild line
+-- (either friendly mode) is repainted too.
+function ns.RefreshFriendlyColors(paletteChanged)
+    local fp = FP()
     for unit, plate in pairs(friendlyPlates) do
-        if UnitIsPlayer(unit) then
-            if useClassColor then
-                local _, classToken = UnitClass(unit)
-                if classToken and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classToken] then
-                    local cc = RAID_CLASS_COLORS[classToken]
-                    plate.health:SetStatusBarColor(cc.r, cc.g, cc.b)
-                end
-            else
-                plate.health:SetStatusBarColor(bc.r, bc.g, bc.b)
-            end
-        else
-            plate.health:SetStatusBarColor(nr, ng, nb)
-            plate.name:SetTextColor(nr, ng, nb)
-        end
+        PaintFriendlyColors(plate, unit, fp)
+    end
+    if paletteChanged and fp and fp.friendlyBelowNameClassColor then
+        ns.RefreshFriendlyBelowName()
     end
 end
 
@@ -1657,7 +1780,7 @@ local function LiveFriendlyVisCVar()
     if not GetCVar then return nil end
     for i = 1, #FRIENDLY_VIS_CVARS do
         local ok, v = pcall(GetCVar, FRIENDLY_VIS_CVARS[i])
-        if ok and v ~= nil then
+        if ok and not (issecretvalue and issecretvalue(v)) and v ~= nil then
             _liveVisCVar = FRIENDLY_VIS_CVARS[i]
             return _liveVisCVar
         end
@@ -1674,6 +1797,69 @@ function ns.ForceFriendlyPlayerCVarsOn()
         pcall(SetCVar, FRIENDLY_VIS_CVARS[i], 1)
     end
     if EllesmereUIDB then EllesmereUIDB.friendlyPlateVisSaved = nil end
+end
+
+-- A copied Retail profile also copies friendlyPlateVisSeeded, but each client
+-- owns a separate CVar cache. Restore the explicitly enabled imported friendly
+-- player appearance once in Forever; later user visibility toggles remain theirs.
+local function MigrateForeverFriendlyVisibility()
+    if not EUI_FOREVER or not EllesmereUIDB or EllesmereUIDB._foreverFriendlyVisibilityMigrated then return end
+    local fp = FP()
+    if not fp or fp.showFriendlyPlayers == false or InCombatLockdown() then return end
+    local _, instanceType = GetInstanceInfo()
+    if IsInFollowerDungeon() or (issecretvalue and issecretvalue(instanceType)) or instanceType ~= "none" then return end
+    local key = LiveFriendlyVisCVar()
+    if not key or not SetCVar then return end
+    local ok, value = pcall(GetCVar, key)
+    if not ok or (issecretvalue and issecretvalue(value)) then return end
+    if value ~= "1" and value ~= 1 then
+        if not pcall(SetCVar, key, 1) then return end
+        ok, value = pcall(GetCVar, key)
+    end
+    if ok and not (issecretvalue and issecretvalue(value)) and (value == "1" or value == 1) then
+        EllesmereUIDB._foreverFriendlyVisibilityMigrated = true
+    end
+end
+
+local foreverFriendlyEvidence = {}
+local function CacheForeverFriendlyEvidence()
+    if not EUI_FOREVER then return end
+    local function Value(value)
+        if issecretvalue and issecretvalue(value) then return "<protected>" end
+        return tostring(value)
+    end
+    local fp = FP() or {}
+    local lines = { "Forever friendly names: enabled=" .. Value(fp.showFriendlyPlayers ~= false)
+        .. " nameOnly=" .. Value(fp.friendlyNameOnly ~= false) .. " classColor=" .. Value(fp.classColorFriendly ~= false)
+        .. " subtitle=" .. Value(fp.friendlyBelowName or "none") .. " migrated="
+        .. Value(EllesmereUIDB and EllesmereUIDB._foreverFriendlyVisibilityMigrated == true) }
+    for _, key in ipairs({ "nameplateShowFriendlyPlayers", "nameplateShowFriends", "nameplateShowOnlyNameForFriendlyPlayerUnits",
+        "nameplateUseClassColorForFriendlyPlayerUnitNames", "ShowClassColorInFriendlyNameplate", "UnitNameFriendlyPlayerName" }) do
+        local ok, value = pcall(GetCVar, key)
+        lines[#lines+1] = "Friendly CVar " .. key .. "=" .. (ok and Value(value) or "unavailable")
+    end
+    local pending, names, custom = 0, 0, 0
+    for _, plate in pairs(ns.pendingUnits or {}) do
+        pending = pending + 1
+        local uf = plate.UnitFrame
+        if uf and not uf:IsForbidden() and uf.name then names = names + 1 end
+    end
+    for _ in pairs(friendlyPlates) do custom = custom + 1 end
+    lines[#lines+1] = string.format("Friendly frames: tracked=%d accessibleNames=%d custom=%d", pending, names, custom)
+    foreverFriendlyEvidence = lines
+end
+function ns.ForeverFriendlyEvidence(lines)
+    -- Snapshot only; no unit names, guild strings, GUIDs or tooltip data.
+    for _, line in ipairs(foreverFriendlyEvidence) do lines[#lines+1] = line end
+end
+if EUI_FOREVER then
+    local evidenceFrame, queued = CreateFrame("Frame"), false
+    for _, event in ipairs({ "CVAR_UPDATE", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED" }) do evidenceFrame:RegisterEvent(event) end
+    evidenceFrame:SetScript("OnEvent", function()
+        if queued then return end
+        queued = true
+        C_Timer.After(0, function() queued = false; CacheForeverFriendlyEvidence() end)
+    end)
 end
 
 --- Follower dungeons force friendly plates off, so we have to remember what
@@ -1775,6 +1961,7 @@ function ns.UpdateFriendlyNameplateSystem()
                     -- Hand back only what a follower dungeon took. Outside that
                     -- case visibility is the user's to own, so nothing is written.
                     RestoreFriendlyVis()
+                    MigrateForeverFriendlyVisibility()
                     pcall(SetCVar, "nameplateShowOnlyNameForFriendlyPlayerUnits", nameOnlyVal)
                 end
                 pcall(SetCVar, "nameplateShowFriendlyNPCs", showNPCs and 1 or 0)
@@ -1840,14 +2027,15 @@ function ns.UpdateFriendlyNameplateSystem()
     -- Name-only font override: apply when name-only AND friendly plates are shown
     local _fp = FP()
     local showFriendly = _fp and _fp.showFriendlyPlayers ~= false
+    -- Class-colour CVar for the friendly player names Blizzard draws: every name
+    -- in name-only mode, the protected instance plates in full-plate mode. A
+    -- combat skip is caught by the visibility retry above.
+    if (nameOnly or shouldEnable) and not InCombatLockdown() then
+        pcall(SetCVar, "nameplateUseClassColorForFriendlyPlayerUnitNames", ns.FriendlyNameClassCVar(_fp))
+    end
     if nameOnly and showFriendly then
         ApplyFriendlyFontOverride()
         -- (nameplate sizing handled by Blizzard in name-only mode)
-        -- Set class-color CVar for Blizzard's name-only rendering
-        if SetCVar and not InCombatLockdown() then
-            local cc = (_fp and _fp.classColorFriendly ~= false) and 1 or 0
-            pcall(SetCVar, "nameplateUseClassColorForFriendlyPlayerUnitNames", cc)
-        end
         -- Sweep name-only plates. NPCs: suppress health bars and color names green,
         -- gated per-unit so Blizzard's "NPC Names" filter is respected -- widgets-only
         -- NPCs are left to Blizzard instead of getting our overlay. Players ride
@@ -1880,6 +2068,7 @@ function ns.UpdateFriendlyNameplateSystem()
 
     -- Apply friendly click-through (independent of player/NPC plate mode).
     ApplyFriendlyClickThrough()
+    CacheForeverFriendlyEvidence()
 end
 
 -------------------------------------------------------------------------------

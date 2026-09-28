@@ -1,0 +1,3 @@
+-- Public distribution: the owner's private profile snapshot is intentionally omitted.
+-- Normal EllesmereUI defaults and existing SavedVariables remain authoritative.
+-- Never install this placeholder over the owner's private customization seed.

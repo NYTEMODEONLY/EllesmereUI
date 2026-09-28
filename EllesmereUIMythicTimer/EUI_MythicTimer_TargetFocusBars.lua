@@ -1,4 +1,5 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
+if EUI_FOREVER then return end -- Retail-only feature; preserved for future port work.
 --------------------------------------------------------------------------------
 --  EUI_MythicTimer_TargetFocusBars.lua
 --  Target/Focus Bars (Mythic+ Tools): standalone cast bars for the target and
@@ -31,15 +32,7 @@ end
 --  Fonts (module surface "mythicTimer": family/outline/shadow are global,
 --  only sizes are per-bar settings).
 --------------------------------------------------------------------------------
-local FONT_FALLBACK = "Interface\\AddOns\\EllesmereUI\\media\\fonts\\Expressway.TTF"
-local function SetFSFont(fs, size)
-    if not (fs and fs.SetFont) then return end
-    local path = (EllesmereUI.GetFontPath and EllesmereUI.GetFontPath("mythicTimer")) or FONT_FALLBACK
-    local outline = (EllesmereUI.GetFontOutlineFlag and EllesmereUI.GetFontOutlineFlag("mythicTimer")) or ""
-    local useShadow = EllesmereUI.GetFontUseShadow and EllesmereUI.GetFontUseShadow("mythicTimer")
-    if EllesmereUI.PrimeFontShadow then EllesmereUI.PrimeFontShadow(fs, useShadow) end
-    fs:SetFont(path, size, outline)
-end
+local function SetFSFont(fs, size) EllesmereUI.ApplyModuleFont(fs, nil, size, "mythicTimer") end
 
 --------------------------------------------------------------------------------
 --  State: two bar objects, built lazily. `bars.target` / `bars.focus`.
@@ -255,8 +248,7 @@ local function StyleBar(bar)
     bar.iconFrame:SetWidth(showIcon and h or 0.001)
     bar.iconFrame:SetShown(showIcon)
 
-    local texPath = EllesmereUI.ResolveTexturePath
-        and EllesmereUI.ResolveTexturePath(ns.barTextures, cfg.texture or "none", "Interface\\Buttons\\WHITE8x8")
+    local texPath = EllesmereUI.ResolveTexturePath(ns.barTextures, cfg.texture or "none", "Interface\\Buttons\\WHITE8x8")
         or "Interface\\Buttons\\WHITE8x8"
     bar.sb:SetStatusBarTexture(texPath)
     local pp = EllesmereUI.PP
@@ -783,7 +775,7 @@ local function ShowInterruptedFlash(bar, interrupterGUID)
     if not ((issecretvalue and issecretvalue(protected)) or not protected) then return end
     bar._interrupted = true
     bar.flash:Show()
-    bar.name:SetText(EllesmereUI.L and EllesmereUI.L("Interrupted") or "Interrupted")
+    bar.name:SetText(EllesmereUI.L("Interrupted") or "Interrupted")
     bar.target:SetText("")
     bar.target:Hide()
     bar.timer:SetText("")

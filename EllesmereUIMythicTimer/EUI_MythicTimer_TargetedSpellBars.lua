@@ -1,4 +1,5 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
+if EUI_FOREVER then return end -- Retail-only feature; preserved for future port work.
 --------------------------------------------------------------------------------
 --  EUI_MythicTimer_TargetedSpellBars.lua
 --  Targeted Spell Bars (Mythic+ Tools): one movable group of cast bars, one per
@@ -27,15 +28,7 @@ end
 --  Fonts: module-wide family/outline/shadow (surface key "mythicTimer"), only
 --  per-text sizes are settings -- same contract as every other bar surface.
 --------------------------------------------------------------------------------
-local FONT_FALLBACK = "Interface\\AddOns\\EllesmereUI\\media\\fonts\\Expressway.TTF"
-local function SetFSFont(fs, size)
-    if not (fs and fs.SetFont) then return end
-    local path = (EllesmereUI.GetFontPath and EllesmereUI.GetFontPath("mythicTimer")) or FONT_FALLBACK
-    local outline = (EllesmereUI.GetFontOutlineFlag and EllesmereUI.GetFontOutlineFlag("mythicTimer")) or ""
-    local useShadow = EllesmereUI.GetFontUseShadow and EllesmereUI.GetFontUseShadow("mythicTimer")
-    if EllesmereUI.PrimeFontShadow then EllesmereUI.PrimeFontShadow(fs, useShadow) end
-    fs:SetFont(path, size, outline)
-end
+local function SetFSFont(fs, size) EllesmereUI.ApplyModuleFont(fs, nil, size, "mythicTimer") end
 
 --------------------------------------------------------------------------------
 --  Shared engines consumed read-only (core addon, loaded before this module).
@@ -86,8 +79,12 @@ local function CurrentWhereBucket()
     if C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive and C_ChallengeMode.IsChallengeModeActive() then
         return "dungeon_mythic"
     end
-    local _, iType, diffID = GetInstanceInfo()
+    local _, iType, diffID, _, _, _, _, _, _, _, hasWorldTier = GetInstanceInfo()
     diffID = tonumber(diffID) or 0
+    -- Lairs carry the World Tier flag instead of a difficulty id the branches
+    -- below know; the instance gate keeps the flag from ever reclassifying
+    -- the open world, whatever else it may be set on.
+    if hasWorldTier == true and iType ~= "none" then return "lair" end
     if iType == "party" then
         if diffID == 23 or diffID == 8 then return "dungeon_mythic" end
         if diffID == 2 or diffID == 1 or diffID == 205 then return "dungeon_nonmythic" end
@@ -111,7 +108,7 @@ end
 -- (PvP, arena) never hides.
 local LOCATION_KEYS = {
     "open_world", "raid_mythic", "raid_heroic", "raid_normal_lfr",
-    "dungeon_mythic", "dungeon_nonmythic", "timewalking", "delve",
+    "dungeon_mythic", "dungeon_nonmythic", "timewalking", "delve", "lair",
 }
 
 -- Combat state is TRACKED from PLAYER_REGEN_DISABLED / _ENABLED instead of
@@ -366,8 +363,7 @@ local function StyleBar(holder, cfg)
         holder.sb:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0)
     end
 
-    local texPath = EllesmereUI.ResolveTexturePath
-        and EllesmereUI.ResolveTexturePath(ns.barTextures, cfg.texture or "none", "Interface\\Buttons\\WHITE8x8")
+    local texPath = EllesmereUI.ResolveTexturePath(ns.barTextures, cfg.texture or "none", "Interface\\Buttons\\WHITE8x8")
         or "Interface\\Buttons\\WHITE8x8"
     holder.sb:SetStatusBarTexture(texPath)
     local pp = EllesmereUI.PP
@@ -382,9 +378,13 @@ local function StyleBar(holder, cfg)
     local un = cfg.uninterruptible
     if un then holder.overlay:SetVertexColor(un.r, un.g, un.b) end
 
-    -- Solid black border on the holder; size 0 removes it.
+    -- Solid black border on the holder; size 0 removes it. The Border Size
+    -- slider stores coordinate units (px * PP.mult) while PP borders take
+    -- physical pixels, so convert here: the bar draws the number the slider
+    -- shows, and the icon divider below follows the same count.
     local bsz = cfg.borderSize
     if bsz == nil then bsz = 1 end
+    if pp and pp.ToPixels then bsz = pp.ToPixels(bsz) end
     if pp and pp.CreateBorder then
         if bsz > 0 then
             if not holder._tsbBorder then

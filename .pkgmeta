@@ -7,6 +7,8 @@ move-folders:
   EllesmereUI/EllesmereUIBags: EllesmereUIBags
   EllesmereUI/EllesmereUIBlizzardSkin: EllesmereUIBlizzardSkin
   EllesmereUI/EllesmereUIChat: EllesmereUIChat
+  EllesmereUI/EllesmereUIChatMeters: EllesmereUIChatMeters
+  EllesmereUI/EllesmereUIForeverEssentials: EllesmereUIForeverEssentials
   EllesmereUI/EllesmereUICooldownManager: EllesmereUICooldownManager
   EllesmereUI/EllesmereUIDamageMeters: EllesmereUIDamageMeters
   EllesmereUI/EllesmereUIDataBars: EllesmereUIDataBars

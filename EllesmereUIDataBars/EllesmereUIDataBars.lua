@@ -13,7 +13,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --
 -- Block factories (clock, fps, ms, location, coords, gold, xprep, spec,
 -- profession, travel, micromenu, currency, spacer) live in
--- EllesmereUIDataBars_Blocks.lua and attach themselves to ns.BlockFactories.
+-- Blocks\*.lua (one file per block, shared helpers in Blocks\Shared.lua) and
+-- attach themselves to ns.BlockFactories.
 --
 -- API HANDOFF (everything the options file may call; nothing else):
 --   ns.GetProfile() -> profile
@@ -62,7 +63,7 @@ EllesmereUI._ModuleNS[ADDON_NAME] = ns  -- LOD options files read this module ns
 local WB = EllesmereUI.Lite.NewAddon("EllesmereUIDataBars")
 ns.WB = WB
 
--- Localized-ish string table shared with the blocks file.
+-- Localized-ish string table shared with the Blocks\ files (ns.L).
 local L = {
     LEFT_CLICK           = "|cffFFFFFFLeft Click:|r",
     RIGHT_CLICK          = "|cffFFFFFFRight Click:|r",
@@ -217,6 +218,16 @@ ns.BLOCK_TYPES = {
     { key = "spacer",     label = "Spacer" },
 }
 
+-- Removed systems cannot be added through the picker.
+function ns.IsBlockSupported(key)
+    return not EUI_FOREVER or (key ~= "greatvault" and key ~= "crests")
+end
+if EUI_FOREVER then
+    for i = #ns.BLOCK_TYPES, 1, -1 do
+        if not ns.IsBlockSupported(ns.BLOCK_TYPES[i].key) then table.remove(ns.BLOCK_TYPES, i) end
+    end
+end
+
 ns.BLOCK_DEFAULTS = {
     clock      = { localTime = true, twentyFour = true, showMail = true, showResting = true, fontSizeClock = nil, fontSizeInfo = nil },
     fps        = {},
@@ -239,7 +250,7 @@ ns.BLOCK_DEFAULTS = {
                    pvp = true, housing = true, journal = true, pet = true, shop = true, help = true },
     currency   = { currencyId = nil, showIcon = true, showDescription = true },
     -- t1..t5 are TIER slots, not currency ids: a season swap replaces the ids
-    -- in the blocks file and the player's checklist selection still applies.
+    -- in Blocks\Shared.lua (CRESTS) and the player's checklist selection still applies.
     crests     = { t1 = true, t2 = true, t3 = true, t4 = true, t5 = true,
                    showIcons = true, separator = "slash", showSeasonProgress = false,
                    hideEmpty = false, reverse = false },
@@ -255,8 +266,18 @@ ns.BLOCK_DEFAULTS = {
     spacer     = {},
 }
 
--- Factories are registered by EllesmereUIDataBars_Blocks.lua.
+-- Factories are registered by Blocks\*.lua.
 ns.BlockFactories = {}
+
+-- WoW Forever has no Great Vault: the block leaves the picker (BLOCK_TYPES),
+-- the add path refuses it (no default) and Blocks\GreatVault.lua returns before
+-- registering its factory, so a bar saved with one shows an empty slot there instead of erroring.
+if EllesmereUI.IS_FOREVER then
+    for i = #ns.BLOCK_TYPES, 1, -1 do
+        if ns.BLOCK_TYPES[i].key == "greatvault" then table.remove(ns.BLOCK_TYPES, i) end
+    end
+    ns.BLOCK_DEFAULTS.greatvault = nil
+end
 
 local DeepCopy = EllesmereUI.Lite.DeepCopy
 
@@ -267,9 +288,28 @@ function ns.GetProfile()
     return WB.db and WB.db.profile
 end
 
+-- Archive only unavailable blocks in the active profile, retaining their
+-- exact settings for recovery. Surviving blocks retain IDs, order and anchors.
+function ns.RemoveUnsupportedBlocks(bar)
+    if not EUI_FOREVER or not bar or not bar.blocks then return end
+    for i = #bar.blocks, 1, -1 do
+        local block = bar.blocks[i]
+        if not ns.IsBlockSupported(block.type) then
+            bar._foreverExcludedBlocks = bar._foreverExcludedBlocks or {}
+            table.insert(bar._foreverExcludedBlocks, 1, { index = i, block = block })
+            table.remove(bar.blocks, i)
+            if bar.fillBlockId == block.id then bar.fillBlockId = nil end
+            if bar.centerBlockId == block.id then bar.centerBlockId = nil end
+        end
+    end
+end
+
 function ns.BarsInOrder()
     local profile = ns.GetProfile()
-    if profile then return profile.bars end
+    if profile then
+        for _, bar in ipairs(profile.bars) do ns.RemoveUnsupportedBlocks(bar) end
+        return profile.bars
+    end
     return {}
 end
 
@@ -278,7 +318,10 @@ function ns.GetBar(id)
     if not profile then return nil end
     local bars = profile.bars
     for i = 1, #bars do
-        if bars[i].id == id then return bars[i] end
+        if bars[i].id == id then
+            ns.RemoveUnsupportedBlocks(bars[i])
+            return bars[i]
+        end
     end
     return nil
 end
@@ -304,8 +347,7 @@ function ns.SetFont(fs, size, barCfg)
     -- SetShadowOffset does not render on 12.x; shadows must ride a FontObject.
     -- Prime BEFORE SetFont -- the inherited shadow survives the typeface call.
     if EllesmereUI.PrimeFontShadow then
-        local useShadow = flags == "" and EllesmereUI.GetFontUseShadow
-            and EllesmereUI.GetFontUseShadow()
+        local useShadow = flags == "" and EllesmereUI.GetFontUseShadow()
         EllesmereUI.PrimeFontShadow(fs, useShadow and true or false)
     end
     fs:SetFont(path, sz, flags)
@@ -394,23 +436,6 @@ function ns.MoneyTokens(amount, showSmall, coinIcons, coloured, abbreviate, forc
         _moneyTokens[3] = (amount % DENOMINATIONS[2].divisor) .. CoinMarker(3, coinIcons, coloured)
     end
     return _moneyTokens
-end
-
-function ns.FormatMoneyPlain(amount, showSmall, coinIcons, abbreviate, forceEnglish)
-    amount = floor(abs(amount or 0))
-    local parts, foundGold = {}, false
-    for i, denom in ipairs(DENOMINATIONS) do
-        local val = floor(amount / denom.divisor)
-        amount = amount % denom.divisor
-        if i == 1 and val > 0 then
-            foundGold = true
-            parts[#parts + 1] = GoldDisplay(val, abbreviate, forceEnglish) .. CoinMarker(i, coinIcons, false)
-        elseif i > 1 and (not foundGold or showSmall ~= false) and (val > 0 or (i == 3 and #parts == 0)) then
-            parts[#parts + 1] = val .. CoinMarker(i, coinIcons, false)
-        end
-    end
-    if #parts > 0 then return tconcat(parts, " ") end
-    return "0" .. CoinMarker(3, coinIcons, false)
 end
 
 function ns.FormatMoney(amount, useColors, showSmall, coinIcons, abbreviate, forceEnglish)
@@ -577,8 +602,6 @@ function ns.CreateFramePool(frameType, parent, template)
             self._inactive[#self._inactive + 1] = f
         end
     end
-
-    function pool:GetActive() return self._active end
 
     return pool
 end
@@ -1832,16 +1855,6 @@ local function MakeBarCtx(id)
         if c and c.thickness then return c.thickness end
         return 30
     end
-    function ctx.GetLengthPx()
-        local rec = live[id]
-        if rec and rec.bar then
-            if ctx.IsVertical() then return rec.bar:GetHeight() end
-            return rec.bar:GetWidth()
-        end
-        local c = ctx.cfg
-        if c and c.length then return c.length end
-        return 400
-    end
     function ctx.RequestLayout()
         ns.RequestLayout(id)
     end
@@ -2159,7 +2172,7 @@ end
 --- reads never, and an override of Never disables one whose scalar does not.
 function ns.VisIsNever(cfg)
     if not cfg then return true end
-    local ov = EllesmereUI.VisOverrideValue and EllesmereUI.VisOverrideValue(cfg)
+    local ov = EllesmereUI.VisOverrideValue(cfg)
     if ov then return ov == "never" end
     return cfg.visibility == "never"
 end
@@ -2485,7 +2498,7 @@ do
             local rec = live[cfg.id]
             if rec and rec.enabled then
                 local vis
-                if EllesmereUI.CheckVisibilityOptions and EllesmereUI.CheckVisibilityOptions(cfg) then
+                if EllesmereUI.CheckVisibilityOptions(cfg) then
                     vis = false
                 else
                     st.inCombat = _inCombat
@@ -2840,6 +2853,7 @@ end
 
 -- Appends a block of typeKey to the bar and applies. Returns the blockCfg.
 function ns.AddBlock(barId, typeKey)
+    if not ns.IsBlockSupported(typeKey) then return end
     local cfg = ns.GetBar(barId)
     if not cfg then return nil end
     if not ns.BLOCK_DEFAULTS[typeKey] then return nil end
@@ -3215,4 +3229,43 @@ end
 
 _G._EDB_RegisterUnlock = function()
     ns.RegisterAllUnlockElements()
+end
+
+-------------------------------------------------------------------------------
+--  Party Mode: spinning data bars. Each block orbits its own bar's centre,
+--  like the action bar spin. Driver, combat pause and rest tracking live in
+--  the shared engine (EllesmereUI.PartySpin_Create, EllesmereUI_PartyMode.lua).
+-------------------------------------------------------------------------------
+do
+    local groups = {}
+    local groupOf = setmetatable({}, { __mode = "k" })   -- bar rec -> reused group
+    EllesmereUI.PartySpin_Create({
+        target = "dataBars",
+        collect = function()
+            wipe(groups)
+            for _, rec in pairs(live) do
+                if rec.enabled and rec.bar and rec.slots then
+                    local grp = groupOf[rec]
+                    if not grp then
+                        grp = { frames = {} }
+                        groupOf[rec] = grp
+                    end
+                    grp.pivot = rec.bar
+                    local list = grp.frames
+                    wipe(list)
+                    for _, slot in pairs(rec.slots) do list[#list + 1] = slot end
+                    groups[#groups + 1] = grp
+                end
+            end
+            return groups
+        end,
+    })
+end
+
+-- Party Mode visibility axis (Visibility > Party Mode): no game event, so the
+-- core fires its own edge.
+if EllesmereUI.RegisterVisEdge then
+    EllesmereUI.RegisterVisEdge(function()
+        if ns.UpdateAllBarVisibility then ns.UpdateAllBarVisibility() end
+    end)
 end

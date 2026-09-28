@@ -1,8 +1,8 @@
-## Interface: 120000, 120001, 120005, 120007, 120100
-## Title: |cff0cd29fEllesmereUI|r
-## Notes: Shared framework for the EllesmereUI addon suite
+## Interface: 120000, 120001, 120005, 120007, 120100, 16001
+## Title: |cff0cd29fEllesmereUI Forever|r
+## Notes: EllesmereUI 9.3 with preserved local Forever enhancements
 ## Author: Ellesmere
-## Version: 9.1.8
+## Version: 9.3-forever.0.4.0
 ## SavedVariables: EllesmereUIDB
 ## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga
 ## X-Curse-Project-ID: 1477613
@@ -10,6 +10,9 @@
 
 # Pre-12.1 client failsafe -- MUST load first (arms the per-file guard line)
 EllesmereUI_ClientGate.lua
+EllesmereUI_Forever.lua
+EllesmereUI_ForeverDiagnostics.lua
+EllesmereUI_ForeverProfile.lua
 
 # Libraries
 Libs\LibStub\LibStub.lua
@@ -17,11 +20,12 @@ Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 Libs\LibDeflate\LibDeflate.lua
-Libs\LibKeystone\LibKeystone.lua
-Libs\LibSpecialization\LibSpecialization.lua
+# Excluded from Forever: Libs\LibKeystone\LibKeystone.lua
+# Excluded from Forever: Libs\LibSpecialization\LibSpecialization.lua
 
 # Lightweight addon framework (replaces Ace3)
 EllesmereUI_Lite.lua
+EllesmereUI_CustomControls.lua
 
 # Central multi-language engine (resolves locale + glyph font; defines L/Lf/EnKey)
 # Translation data lives in the LoadOnDemand EllesmereUILocales child addon,
@@ -40,6 +44,7 @@ EllesmereUI_Startup.lua
 
 # Shared EllesmereUI Files
 EllesmereUI.lua
+EllesmereUI_RetailAtlas.lua
 EllesmereUI_BuffPresets.lua
 EllesmereUI_UICore.lua
 EllesmereUI_Ticker.lua
@@ -55,14 +60,20 @@ EllesmereUI_PartyMode.lua
 EUI_MacroFactory.lua
 EUI_UnlockMode.lua
 EllesmereUI_Glows.lua
+EllesmereUI_ClassicArt.lua
 EllesmereUI_Range.lua
 EllesmereUI_AuraKit.lua
 EllesmereUI_WarriorCharges.lua
+EllesmereUI_ManaRegenSpark.lua
+# Personal layout is owned by the local native adapters: EllesmereUI_ForeverLayout.lua
 EllesmereUI_FirstInstall.lua
 EllesmereUI_RaidFramesPopup.lua
 EllesmereUI_PatchNotesPopup.lua
 EllesmereUI_WindowSkinsPopup.lua
 EllesmereUI_SpecOverridesPopup.lua
+EllesmereUI_StyleCards.lua
+EllesmereUI_StyleChoicePopup.lua
+EllesmereUI_StyleLaunchPopup.lua
 EllesmereUI_VideoGuides.lua
 
 # Spec Overrides (per-spec setting overrides within a profile)

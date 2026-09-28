@@ -1,0 +1,10 @@
+## Interface: 120100, 16001
+## Title: EllesmereUI Meters Tab (Custom)
+## Notes: Independent companion: embeds the first two meter windows in chat and remembers the selected views.
+## Author: Pick Me / Custom
+## Version: 9.3-forever.0.4.0
+## Dependencies: EllesmereUI, EllesmereUIChat, EllesmereUIDamageMeters
+## SavedVariablesPerCharacter: EllesmereUIChatMetersDB
+
+ChatMeters.lua
+SettingsIntegration.lua
