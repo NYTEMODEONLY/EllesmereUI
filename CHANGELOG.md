@@ -1,5 +1,10 @@
 # Custom release history
 
+## Maintenance - September 27, 2026
+
+Retired the owner-machine Zero delegation workflow. Agents perform requested
+work directly; addon runtime and user settings are unchanged.
+
 ## 9.3-forever.0.4.0 — September 27, 2026
 
 First published baseline of the maintained custom installation, based on official

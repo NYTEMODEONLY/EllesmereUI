@@ -1,28 +1,7 @@
 # Custom EllesmereUI Forever repository
 
-## Owner-machine local delegation
-
-For the owner's local addon work, use Zero by default for suitable bounded
-coding, data and documentation tasks. Read the installed AddonOverseer/ZERO.md
-runbook and complete required startup diagnostics first. Give Zero precise
-instructions, selected source snapshots, writable-file limits and acceptance
-criteria. Keep connection details and job artifacts in the private local setup.
-
-The frontier supervisor owns planning, necessary investigation, independent
-review/tests and authorized publication/deployment. While its Zero job runs,
-wait using the bridge's bounded wait command; do not run parallel paid agents or
-duplicate the work. Check the serial job list and never cancel another chat's
-job. Tiny mechanical edits can stay with the supervisor when handoff costs more;
-state the reason. Report an unavailable/failed Zero job instead of silently
-substituting a paid worker or enabling cloud fallback. Other contributors must
-not assume access to the owner's local infrastructure.
-
-Exclude saves, private seeds, credentials and personal histories from task inputs;
-skip reparse points. Review returned diffs, recheck source hashes and run the
-required checks before applying changes. Zero has bounded file tools, not shell,
-web or test execution. Retain accepted corrections locally for future training;
-feedback does not automatically change weights. All existing preservation,
-capture, publishing, reload-first and no-game-input requirements remain in force.
+The owner retired Zero delegation on September 27, 2026. Perform requested
+work directly; do not restore local-worker delegation requirements.
 
 Owner instruction (September 27, 2026): every custom change/update must be
 committed and pushed to https://github.com/NYTEMODEONLY/EllesmereUI. Major updates
