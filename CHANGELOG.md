@@ -1,5 +1,13 @@
 # Custom release history
 
+## Grimlight companion release format - October 1, 2026
+
+The custom Grimlight Meters Tab companion now declares `v0.4.0`, following the
+owner's `vMAJOR.MINOR.PATCH` release format. This is a metadata-only change;
+behavior and saved data declarations are unchanged. EUI host modules retain
+their existing versions and attribution. The private capture and public source
+manifest preserve the exact companion bytes.
+
 ## Source preservation and Meters artwork - October 1, 2026
 
 Preserve the companion’s already-installed Grimlight identity and owner credit;
