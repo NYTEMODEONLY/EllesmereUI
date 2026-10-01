@@ -181,7 +181,7 @@ local function Challenge(row)
         if row.Icon.frame then row.Icon.frame:SetVertexColor(0.65, 0.65, 0.65) end
     end
     if row.Shield then Text(row.Shield.Points); Text(row.Shield.DateCompleted) end
-    if row.Tracked then W.Checkbox(row.Tracked, { stockCheck = true }); Text(row.Tracked.Text, true) end
+    if row.Tracked then W.Checkbox(row.Tracked, { stockCheck = true, boxInset = true }); Text(row.Tracked.Text, true) end
     W.AddBorder(row)
     Hook(row, "RefreshStateArt", Challenge)
     Hook(row, "Saturate", Challenge)

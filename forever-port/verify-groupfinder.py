@@ -28,6 +28,7 @@ local function frame()
     function f:CreateTexture() return texture() end
     function f:HookScript(event,fn) self.hooks[event]=fn end
     function f:GetFontString() return self.Text end
+    function f:GetFrameLevel() return self.level or 3 end
     function f:GetRegions() return end
     function f:SetText() error("adapter attempted a native text write") end
     function f:SetScript() error("adapter replaced native scripts") end
@@ -35,6 +36,14 @@ local function frame()
     function f:Show() error("adapter changed native visibility") end
     function f:Hide() error("adapter changed native visibility") end
     f.OnClick=function() return "native action" end
+    return f
+end
+-- Frames the adapter creates for itself may be placed; native frames may not.
+function CreateFrame(kind,name,parent)
+    local f=frame(); f.owned=true; f.parent=parent; f.points={}
+    function f:SetPoint(point,to,rel,x,y) self.points[point]={to,rel,x,y} end
+    function f:SetFrameLevel(l) self.level=l end
+    parent.ownedChildren=parent.ownedChildren or {}; table.insert(parent.ownedChildren,f)
     return f
 end
 local function pool(...)
@@ -70,7 +79,7 @@ function W.Font(f,r,g,b) if f then f.font=true; if r then f.color={r,g,b} end en
 function W.AddBorder(f) f.border=true end
 function W.Button(f) f.buttonSkin=true end
 function W.StateButtonLabel() end
-function W.Checkbox(f) f.checkSkin=true end
+function W.Checkbox(f,opt) assert(opt and opt.stockCheck and opt.boxInset==true,"LFG checkbox must draw one inset box"); f.checkSkin=true end
 function W.Dropdown(f) if f then f.dropdownSkin=true end end
 function W.Panel(f) f.panelSkin=true end
 function W.Shell(key,f) assert(key=="lfg"); f.shell=true end
@@ -114,6 +123,11 @@ LFGListingFrame.NewPlayerFriendlyButton={CheckButton=frame(),Icon=texture()}
 LFGListingFrame.CategoryView={CategoryButtons={category}}
 local comment=frame(); comment.EditBox=frame(); comment.EditBox.Instructions=texture()
 comment.EditBox.securityDisableSetText=true; comment.EditBox.securityDisablePaste=true
+for _,key in ipairs({"TopLeftTex","TopRightTex","TopTex","BottomLeftTex","BottomRightTex","BottomTex","LeftTex","RightTex","MiddleTex"}) do comment[key]=texture() end
+local fills=0
+function comment:CreateTexture() fills=fills+1; return texture() end
+function comment.EditBox:CreateTexture() error("comment EditBox was given a box of its own") end
+CommentFills=function() return fills end
 comment.ScrollBar={ThumbTexture=texture(),ScrollUpButton={Icon=texture()},ScrollDownButton={Icon=texture()}}
 LFGListingFrame.ActivityView={ScrollBox=scroll(activity),ScrollBar=scrollBar(),Comment=comment}
 LFGListingFrame.LockedView={ErrorText=texture(),ActivityText=texture(),framePool=pool(lockedLine),shown=true}
@@ -150,6 +164,15 @@ function VerifyGroupFinder()
     assert(activity.InstanceLockWarningIcon.Icon.alpha==1 and activity.CheckButton.checked,"activity lock/selection changed")
     assert(category.Icon.alpha==1 and category.Label.font,"category identity lost")
     assert(comment.EditBox.securityDisableSetText and comment.EditBox.securityDisablePaste,"comment security changed")
+    -- One box: ours, at the native border art's extent. None on the EditBox or the ScrollFrame.
+    local box=comment.ownedChildren and comment.ownedChildren[1]
+    assert(box and #comment.ownedChildren==1 and box.border and box.parent==comment,"comment box missing or duplicated")
+    assert(box.points.TOPLEFT[1]==comment and box.points.TOPLEFT[3]==-5 and box.points.TOPLEFT[4]==5 and box.points.BOTTOMRIGHT[3]==5 and box.points.BOTTOMRIGHT[4]==-5,"comment box is not at the native art extent")
+    assert(box.level==comment:GetFrameLevel(),"comment box would cover the text")
+    assert(not comment.border and CommentFills()==0 and not comment.EditBox.border,"second comment outline remains")
+    assert(comment.TopLeftTex.alpha==0 and comment.MiddleTex.alpha==0,"native comment border art still drawn")
+    assert(comment.EditBox.font and comment.EditBox.Instructions.font,"comment text not themed")
+    assert(LFGWhoListFrame.EditBox.border,"single-line Who input lost its box")
     assert(comment.ScrollBar.ScrollUpButton.Icon.alpha==1 and comment.ScrollBar.ScrollDownButton.Icon.alpha==1,"legacy comment arrows removed")
     assert(result.ClassIcon.alpha==1 and result.NewPlayerFriendlyIcon.alpha==1 and not result.Selected.shown,"result icons/state lost")
     assert(result.Name.color[1]==.3 and result.ActivityName.color[1]==.3 and who.Class.color[1]==.3,"semantic text colors changed")

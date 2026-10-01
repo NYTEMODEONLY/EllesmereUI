@@ -191,7 +191,7 @@ local function Mounts(frame)
             for _, key in ipairs({ "Name", "Source", "Lore", "New" }) do Font(display.InfoButton[key]) end
         end
         local toggle = display.ModelScene and display.ModelScene.TogglePlayer
-        if toggle then W.Checkbox(toggle, { stockCheck = true }); Font(toggle.TogglePlayerText) end
+        if toggle then W.Checkbox(toggle, { stockCheck = true, boxInset = true }); Font(toggle.TogglePlayerText) end
         -- NoMountsTex, camera controls, models, random/flying spell glyphs stay.
     end
     OnShow(frame, Mounts)

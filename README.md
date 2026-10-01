@@ -27,6 +27,9 @@ not replace every official feature with a second custom implementation.
 - **Persistent selection and automation:** the selected Chat/Meters view is saved
   per character. Optional instance-entry selection and return-to-chat on exit are
   available through **Damage Meters → Chat Meters (Custom)** or `/eumeters`.
+- **Grimlight Meters artwork:** the addon-list icon and existing sidebar slot use
+  AI-generated fantasy artwork with ascending crystal meter columns. The host
+  still owns sidebar tint, sizing and behavior; native visual acceptance is pending.
 - **Normal meter controls:** headers, menus, scrolling, reports and breakdowns
   remain available. Chat resizing immediately resizes the embedded panes;
   settings, Edit Mode and EUI Unlock Mode preserve embedding. Explicitly disabling

@@ -186,7 +186,13 @@ local function Crafting(page)
         end
         for _, key in ipairs({ "TrackRecipeCheckbox", "AllocateBestQualityCheckbox" }) do
             local checkbox = form[key]
-            if checkbox then W.Checkbox(checkbox, { stockCheck=true }); W.Font(checkbox.Text) end
+            if checkbox then
+                -- The shared professions pack runs first and already replaces
+                -- these with its own 14px box; a second box drew a double outline.
+                local replaced = W.GetFFD and W.GetFFD(checkbox).custom
+                if not replaced then W.Checkbox(checkbox, { stockCheck=true, boxInset=true }) end
+                W.Font(checkbox.Text)
+            end
         end
         if form.RecipeSourceButton then W.Font(form.RecipeSourceButton.Text) end
         if form.FirstCraftBonus then W.Font(form.FirstCraftBonus.Text) end

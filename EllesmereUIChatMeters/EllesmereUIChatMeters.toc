@@ -1,8 +1,10 @@
 ## Interface: 120100, 16001
-## Title: EllesmereUI Meters Tab (Custom)
-## Notes: Independent companion: embeds the first two meter windows in chat and remembers the selected views.
-## Author: Pick Me / Custom
+## Title: Grimlight Meters Tab
+## Notes: EllesmereUI companion: embeds the first two meter windows in chat and remembers the selected views. By |cfff58cbaVeruca Grimlight|r.
+## Author: Veruca Grimlight
 ## Version: 9.3-forever.0.4.0
+## Category: Grimlight Tools
+## IconTexture: Interface\AddOns\EllesmereUIChatMeters\Media\GrimlightMetersTab
 ## Dependencies: EllesmereUI, EllesmereUIChat, EllesmereUIDamageMeters
 ## SavedVariablesPerCharacter: EllesmereUIChatMetersDB
 

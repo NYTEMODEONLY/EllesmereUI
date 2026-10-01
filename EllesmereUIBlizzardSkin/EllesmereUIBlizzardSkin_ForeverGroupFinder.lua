@@ -48,7 +48,9 @@ local function TextButton(button)
 end
 local function Checkbox(button)
     if not button then return end
-    W.Checkbox(button, { stockCheck = true })
+    -- Native boxes are 24 and 30 wide on 22-high rows: one inset box, or the
+    -- frame-sized borders overlap down the activity list.
+    W.Checkbox(button, { stockCheck = true, boxInset = true })
 end
 local function Input(box)
     if not box then return end
@@ -59,7 +61,8 @@ local function Input(box)
     end
     Font(box)
     Font(box.Instructions)
-    -- No SetText, focus, security, paste or script changes, including Comments.
+    -- Single-line inputs only: the box is the EditBox itself. No SetText,
+    -- focus, security, paste or script changes.
 end
 local function ScrollBar(bar)
     if not bar then return end
@@ -76,6 +79,32 @@ local function ScrollBar(bar)
     end
     W.ScrollBar(bar)
     for _, arrow in ipairs(arrows) do arrow[1]:SetAlpha(arrow[2]) end
+end
+local COMMENT_ART = { "TopLeftTex", "TopRightTex", "TopTex", "BottomLeftTex", "BottomRightTex", "BottomTex", "LeftTex", "RightTex", "MiddleTex" }
+local function CommentBox(scroll)
+    if not scroll then return end
+    -- UIPanelInputScrollFrameTemplate: the ScrollFrame is the visible box and
+    -- its EditBox is a single text line inside it, so a box on each drew two
+    -- outlines. One box only, on our own frame at the extent of the native
+    -- border art (5 outside the ScrollFrame), which keeps the text's padding.
+    local d = Data(scroll)
+    if not d.box then
+        local box = CreateFrame("Frame", nil, scroll)
+        box:SetPoint("TOPLEFT", scroll, "TOPLEFT", -5, 5)
+        box:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", 5, -5)
+        box:SetFrameLevel(scroll:GetFrameLevel())
+        d.box = box
+    end
+    Fill(d.box)
+    for _, key in ipairs(COMMENT_ART) do
+        if scroll[key] then scroll[key]:SetAlpha(0) end
+    end
+    local edit = scroll.EditBox
+    Font(edit)
+    Font(edit and edit.Instructions)
+    Font(scroll.Instructions)
+    ScrollBar(scroll.ScrollBar)
+    -- No SetText, focus, security, paste or script changes on the EditBox.
 end
 local function SideTab(tab)
     if not tab then return end
@@ -158,15 +187,7 @@ local function Listing(frame)
         ScrollBar(activity.ScrollBar)
         WatchRows(activity.ScrollBox, Activity)
         Flat(activity.BarMiddle, T.brdR, T.brdG, T.brdB, 0.7)
-        if activity.Comment then
-            Fill(activity.Comment)
-            for _, key in ipairs({ "TopLeftTex", "TopRightTex", "TopTex", "BottomLeftTex", "BottomRightTex", "BottomTex", "LeftTex", "RightTex", "MiddleTex" }) do
-                if activity.Comment[key] then activity.Comment[key]:SetAlpha(0) end
-            end
-            Input(activity.Comment.EditBox)
-            Font(activity.Comment.Instructions)
-            ScrollBar(activity.Comment.ScrollBar)
-        end
+        CommentBox(activity.Comment)
     end
     Locked(frame.LockedView)
 end

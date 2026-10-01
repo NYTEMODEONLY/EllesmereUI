@@ -1,5 +1,19 @@
 # Custom release history
 
+## Source preservation and Meters artwork - October 1, 2026
+
+The Meters companion now uses the selected AI-generated illustrated icon for
+the addon list and its existing sidebar slot. Versions, runtime behavior and
+saved declarations are unchanged; native rendering awaits player acceptance.
+
+Preserve previously installed Forever checkbox and comment-box fixes that were
+missing from this public source: one inset box on oversized native checkboxes,
+no second box on already themed profession controls, and one owned frame for
+the Group Finder comment outline. Existing regression sources accompany them.
+The full private verification passes 51 active scripts and Lua 5.1 compilation.
+Private profiles, diagnostics and native fixtures remain excluded. This source
+update does not clear any standalone Grimlight CurseForge release.
+
 ## Meters companion license - October 1, 2026
 
 Added the owner's All Rights Reserved notice for original Grimlight contributions

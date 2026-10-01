@@ -38,7 +38,7 @@ local function TextButton(button)
 end
 local function Check(frame)
     if not frame then return end
-    if frame.Button then W.Checkbox(frame.Button, { stockCheck = true }) end
+    if frame.Button then W.Checkbox(frame.Button, { stockCheck = true, boxInset = true }) end
     Font(frame.Label)
     -- Do not call UpdateDisplay: it sets checked/enabled state and reads CVars.
 end

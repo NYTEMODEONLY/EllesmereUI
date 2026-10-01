@@ -559,19 +559,34 @@ function WSkin.Checkbox(cb, opts)
             r:SetAlpha(0)
         end
     end
+    -- opts.boxInset draws ONE box: fill and border share the inset. For stock
+    -- templates whose frame is larger than the box it shows (the 22-32px
+    -- CheckButtons): a border on the frame plus a fill 4px inside it reads as
+    -- two nested boxes, and 30px frames on 22px rows overlap their neighbors.
+    -- true = a fifth of the shorter side, never shrinking the box below 12.
+    local bx = opts and opts.boxInset
+    if bx == true then
+        local w, h = cb:GetSize()
+        local side = 0
+        if w and h and not (issecretvalue(w) or issecretvalue(h)) then side = math.min(w, h) end
+        bx = side > 0 and math.max(0, math.min(math.floor(side * 0.2 + 0.5), math.floor((side - 12) / 2))) or 4
+    end
+    local fi = bx or 4
     local fill = SolidTex(cb, "BACKGROUND", 0.02, 0.02, 0.02, 1)
-    fill:SetPoint("TOPLEFT", 4, -4)
-    fill:SetPoint("BOTTOMRIGHT", -4, 4)
+    fill:SetPoint("TOPLEFT", fi, -fi)
+    fill:SetPoint("BOTTOMRIGHT", -fi, fi)
     d.bg = fill
     -- Border rides the checkbox frame by default; when the frame is larger
     -- than its visible box (opts.borderInset), put the border on an inset
     -- child so it hugs the actual box instead of sitting proud of it.
-    local bi = opts and opts.borderInset
+    local bi = bx or (opts and opts.borderInset)
     if bi and bi > 0 then
         local bh = CreateFrame("Frame", nil, cb)
         bh:SetPoint("TOPLEFT", bi, -bi)
         bh:SetPoint("BOTTOMRIGHT", -bi, bi)
-        bh:SetFrameLevel(cb:GetFrameLevel() + 1)
+        -- boxInset keeps the host at the checkbox's level so the stock check,
+        -- which is wider than the box, draws over the border line.
+        bh:SetFrameLevel(cb:GetFrameLevel() + (bx and 0 or 1))
         AddBorder(bh, 0.25, 0.25, 0.25, 1)
         d.borderHost = bh
     else

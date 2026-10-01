@@ -51,7 +51,10 @@ local W={Theme={insetR=.05,insetG=.05,insetB=.05,accR=.2,accG=.8,accB=.5}}
 function W.AddBorder(f) f.bordered=true end
 function W.Font(f,r,g,b) if not f then return end; f.themedFont=true; if r then f:SetTextColor(r,g,b) end end
 function W.Button(f) f.themedButton=true end
-function W.Checkbox(f) f.themedCheckbox=true end
+function W.Checkbox(f,opt) assert(opt and opt.stockCheck and opt.boxInset==true,'profession checkbox must draw one inset box'); f.themedCheckbox=true end
+-- The shared professions pack marks checkboxes it has already replaced.
+local ffd={}
+function W.GetFFD(f) ffd[f]=ffd[f] or {}; return ffd[f] end
 function W.WindowCallback(_,fn) return function(...) if not disabled then return fn(...) end end end
 local pending
 function W.Debounce(fn) return function() pending=fn end end
@@ -146,6 +149,7 @@ function scroll:ForEachFrame(fn) for _,row in ipairs(self.rows) do fn(row) end e
 ScrollUtil={AddInitializedFrameCallback=function(scroll,fn,owner) scroll.initialized=function(row) fn(owner,row) end end}
 local form=New(); page.SchematicForm=form; form.OutputText=New(); form.Description=New(); form.RequiredTools=New(); form.RequiredTools:SetTextColor(1,1,0)
 form.Reagents={Label=New()}; form.TrackRecipeCheckbox=New(); form.TrackRecipeCheckbox.Text=New(); form.TrackRecipeCheckbox.checked=true; form.TrackRecipeCheckbox.scripts.OnClick=Caster
+form.AllocateBestQualityCheckbox=New(); form.AllocateBestQualityCheckbox.Text=New(); ns.WSkin.GetFFD(form.AllocateBestQualityCheckbox).custom=true
 local slot=New(); slot.Name=New(); slot.Button=New(); slot.Button.Count=New(); slot.Button.Icon=New(); slot.Button.QualityOverlay=New()
 slot.Name:SetTextColor(1,0,0); slot.Button.Count:SetTextColor(1,0,0); slot.Button.Count.text='0 / 3'; slot.Button.Icon.texture='Linen Cloth'
 form.reagentSlotPool={slots={slot},EnumerateActive=function(self) local i=0; return function() i=i+1; return self.slots[i] end end}
@@ -190,6 +194,7 @@ assert(form.RequiredTools.color[1]==1 and form.RequiredTools.color[2]==1 and for
 assert(x.slot.Name.themedFont and x.slot.Name.color[1]==1 and x.slot.Name.color[2]==0,'insufficient reagent color changed')
 assert(x.slot.Button.Count.text=='0 / 3' and x.slot.Button.Icon.texture=='Linen Cloth' and x.slot.Button.QualityOverlay.alpha==1,'reagent data or quality art changed')
 assert(form.TrackRecipeCheckbox.themedCheckbox and form.TrackRecipeCheckbox.checked and form.TrackRecipeCheckbox.scripts.OnClick==Caster,'tracking state or command changed')
+assert(not form.AllocateBestQualityCheckbox.themedCheckbox and form.AllocateBestQualityCheckbox.Text.themedFont,'already replaced checkbox was boxed a second time')
 local spinner=page.CreateMultipleInputBox
 assert(spinner.themedFont and spinner.value==3 and spinner.min==1 and spinner.max==15 and not spinner.enabled,'quantity or disabled state changed')
 assert(spinner.IncrementButton.normal.alpha==1 and spinner.DecrementButton.normal.alpha==1 and spinner.scripts.OnMouseWheel==Caster,'quantity arrows/input lost')

@@ -58,7 +58,7 @@ local function Install()
     end
     local function Checkbox(button)
         if not button then return end
-        W.Checkbox(button, { stockCheck = true })
+        W.Checkbox(button, { stockCheck = true, boxInset = true })
         Font(button.Text or button.Label)
     end
     local function Input(box)

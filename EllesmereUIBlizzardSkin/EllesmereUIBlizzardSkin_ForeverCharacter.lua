@@ -306,7 +306,7 @@ local function Detail(pane)
     Progress(pane.RankBar)
     for _, key in ipairs({ "AtWarCheckbox", "MakeInactiveCheckbox", "WatchFactionCheckbox", "InactiveCheckbox", "BackpackCheckbox" }) do
         local cb = pane[key]
-        if cb then W.Checkbox(cb, { stockCheck = true }); Font(cb.Label) end
+        if cb then W.Checkbox(cb, { stockCheck = true, boxInset = true }); Font(cb.Label) end
     end
     TextButton(pane.ViewRenownButton)
     -- CurrencyTransferToggleButton is an icon control, not a text button.
