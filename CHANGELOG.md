@@ -1,5 +1,12 @@
 # Custom release history
 
+## Meters companion license - October 1, 2026
+
+Added the owner's All Rights Reserved notice for original Grimlight contributions
+to the Meters companion, with free downloads and readable source. This does not
+relicense upstream code/assets or clear a standalone CurseForge release.
+Runtime and existing third-party rights are unchanged.
+
 ## Maintenance - September 27, 2026
 
 Retired the owner-machine Zero delegation workflow. Agents perform requested

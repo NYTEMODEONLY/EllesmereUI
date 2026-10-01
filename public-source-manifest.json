@@ -79,6 +79,7 @@
     "EllesmereUIChat/Media/chat_voice.png": "eeca6c667946b0ac19e50228cb617131182d9e5185a512933b757e7c23fa2ed5",
     "EllesmereUIChatMeters/ChatMeters.lua": "dc6498d9eba6a51b6be283169b6ca8cae911ffb90e833471b3e3029d030878c8",
     "EllesmereUIChatMeters/EllesmereUIChatMeters.toc": "756b74abf34cd57332ee9023c4babffde17718b9020be876b8b28a301f97ca96",
+    "EllesmereUIChatMeters/LICENSE": "eacaa99162a21c2db69987682907115a44d2b9387da714fb4f369ff624d0f9f9",
     "EllesmereUIChatMeters/Media/meters.tga": "98d434fcbe6cf1aeb21e73c3256e48726df09a103e0f286411bdc3b3eb9c68bb",
     "EllesmereUIChatMeters/SettingsIntegration.lua": "310ebdee14664264c93e77ab77c16c96ad755484da7150ca91c6bd95f4596069",
     "EllesmereUIChatMeters/tests/mock_wow.lua": "6019f43768cde8599b3fa7de70f2e7f7221029fd8ab9da5b2d38f766d5a9d3c3",
