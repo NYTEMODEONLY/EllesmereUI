@@ -1,5 +1,28 @@
 # Custom EllesmereUI Forever repository
 
+## Neutral packages and Grimlight companion releases — October 1, 2026
+
+All public downloads begin with reviewed neutral defaults. Never include the
+owner's saved choices, layouts, anchors, binds, private profile seeds, character
+mappings, histories, scans, prices, receipts, queues, logs, recovery exports or
+credentials. Keep the exact no-op profile placeholder; preserve installed
+private settings separately. Verify clean staging, final ZIP contents and a
+fresh synthetic install without owner saves, plus supported data-preserving
+upgrades. Internal agent-guide edits alone do not bump runtime versions.
+
+EUI itself remains third-party with its original credits/licenses and this
+repository's authorized GitHub-only publishing workflow. Do not upload EUI to
+GrimlightTools or upstream CurseForge/Wago projects. The original custom
+ChatMeters embedding companion is separately owned Grimlight work. Every
+player-facing companion fix/update also requires its new vMAJOR.MINOR.PATCH
+CurseForge release under standing owner authorization. Establish its own
+verified project when eligible; no project ID is recorded yet. Package only
+original companion source and disclose separately installed hosts. Verify
+submission, moderation and publication separately; an unpublished upload is
+not delivery. Record blockers and finish publication when eligible without
+repeat permission. The sole allowed owner-profile exception belongs to the
+separate Auctions base Veruca v0.1; it permits no personal data in EUI/Meters.
+
 The owner retired Zero delegation on September 27, 2026. Perform requested
 work directly; do not restore local-worker delegation requirements.
 

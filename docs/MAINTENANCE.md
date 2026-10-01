@@ -1,5 +1,21 @@
 # Publishing and release maintenance
 
+October 1 owner clarification: EUI's GitHub workflow and upstream credits stay
+unchanged. The separately owned Grimlight ChatMeters companion also needs a
+versioned release on its own CurseForge project for each player-facing update,
+once eligible. This is standing authorization; record moderation/publication
+blockers rather than treating a local push as completed delivery. No verified
+companion CurseForge ID is recorded yet; never use an upstream/host project.
+Internal maintenance/AGENTS-only edits require no runtime bump or duplicate
+release. See [the current public guide](../AGENTS.md).
+
+Downloads must be neutral fresh installations, without owner profile seeds,
+settings/layouts, histories, diagnostics, generated receipts or credentials.
+Keep the documented no-op profile replacement and inspect staged/final bytes;
+verify clean startup without owner saves. Preserve existing players' data in
+supported upgrades. The Auctions base-profile exception applies to that separate
+addon only and provides no exception for EUI or Meters.
+
 Every completed change goes to this repository. Major updates also get GitHub
 Releases. Use a normal forward commit; never reset this fork to upstream or move
 published tags. Existing proposal branches are independent and stay preserved.
