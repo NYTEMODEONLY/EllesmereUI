@@ -77,13 +77,18 @@ local function ZoneShouldBeLogged()
     if not c.enabled then return false end
 
     local _, zoneType, rawDiff, _, playerCap, _, _, rawMapID = GetInstanceInfo()
-    -- Forever dungeons and raids use their native instance types, without
-    -- Retail map thresholds or Mythic difficulty requirements.
-    if EUI_FOREVER then
-        if zoneType == "party" then return GetTrigger(c, "log5pp") end
+
+    -- WoW Forever: every raid instance logs on the Raids trigger (the Normal
+    -- Raid key and its default) and every dungeon on the Dungeons trigger (a
+    -- key only that client offers, off until the player turns it on). Retail
+    -- map thresholds, difficulties, Mythic+, arenas and scenarios do not
+    -- apply there.
+    if EllesmereUI.IS_FOREVER then
         if zoneType == "raid" then return GetTrigger(c, "logNormal") end
+        if zoneType == "party" then return c.logDungeon == true or (c.logDungeon == nil and GetTrigger(c, "log5pp")) end
         return false
     end
+
     local diff  = tonumber(rawDiff)
     local mapID = tonumber(rawMapID)
     if not diff or not mapID then return false end

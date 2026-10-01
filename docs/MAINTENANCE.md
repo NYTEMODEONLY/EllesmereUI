@@ -54,8 +54,17 @@ workflow publishes only to the owner's GitHub. Do not restore those uploads.
 The owner maintains a full private staged regression runner using Python, lupa
 Lua 5.1 and preserved native source fixtures. Use its error_reporter.py verify
 wrapper when working on that installation. Keep assertions and resolved issue
-evidence; private fixture absence is not a passed check. The baseline had 50
-passing active scripts plus Lua 5.1 compilation on September 27, 2026.
+evidence; private fixture absence is not a passed check. The v9.3.4 integration has
+52 passing active scripts plus Lua 5.1 compilation on October 1, 2026.
+
+Review the [v9.3.4 integration audit](UPSTREAM_9.3.4.md) before the next update.
+The official framework and ResourceBars options were split into separate files;
+local popup fixes now belong in EllesmereUI_Popups.lua. Merge from the current
+matching official/custom pair, never a fixed historical baseline. Preserve
+ChatMeters' independent v0.4.0 version. The new official Threat bridge must stand
+down while the custom provider exists. Missing-buff modules must also stand down
+for the native group renderer. Include verify-flight-timer.py and
+verify-9.3.4-features.py; fixture changes must preserve behavior assertions.
 
 Regression sources are included for review, but their expected layout is an
 AddOns-shaped stage (core files under EllesmereUI/ alongside sibling modules).

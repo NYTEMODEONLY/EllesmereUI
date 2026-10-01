@@ -24,7 +24,7 @@ lua.execute(source('EllesmereUIRaidFrames/EllesmereUIRaidFrames_Forever.lua'))
 lua.execute('assert(not EUI_FOREVER_NATIVE_GROUPS); SlashCmdList.EUIFOREVERGROUPS("native"); assert(EllesmereUIDB.foreverGroupRenderer=="native")')
 for p in (ROOT/'EllesmereUIRaidFrames').glob('*.lua'):
     if p.name=='EllesmereUIRaidFrames_Forever.lua': continue
-    lua.execute('EUI_FOREVER_NATIVE_GROUPS=true')
+    lua.execute("EUI_FOREVER_NATIVE_GROUPS=true; EllesmereUI={IS_FOREVER=true}; CreateFrame=function() error('official group module allocated a native-mode frame') end")
     lua.execute(p.read_text(encoding='utf-8-sig'))
 print('PASS: explicit group renderer selection, combat refusal, unchanged profile and all custom-engine chunks inert under native ownership')
 
@@ -63,10 +63,14 @@ local function CreateBar()
  bar={dest=label(),time=label(),Show=function(self) self.shown=true end,
       Hide=function(self) self.shown=false end,
       SetTimerDuration=function(self,duration) self.duration=duration.duration end}
+ bar.track=bar
 end
 local function ApplyFillColor() end
+local function ApplyStyle() end
+local function ShowBar(show) bar.shown=show end
+local function ScrollStrip() end
 '''+logic+'''
-T={Route=RouteYards,Apply=Apply,Event=OnEvent,
+T={Route=RouteInfo,Apply=Apply,Event=OnEvent,
  State=function() return flight,bar,ticker,pending end}
 ''')
 lua.execute('''

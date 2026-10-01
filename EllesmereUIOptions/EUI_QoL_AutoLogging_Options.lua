@@ -27,11 +27,14 @@ local TRIGGER_ITEMS = {
     { key = "logArena",    label = "Arena" },
     { key = "logScenario", label = "Scenarios" },
 }
-
-if EUI_FOREVER then
+-- WoW Forever: every raid instance logs on the Raids trigger (the Normal Raid
+-- key and its default) and every dungeon on the Dungeons trigger (a key only
+-- that client offers, off until the player turns it on). The retail
+-- difficulty, Mythic+, arena and scenario rows have nothing to match there.
+if EllesmereUI.IS_FOREVER then
     TRIGGER_ITEMS = {
-        { key = "logNormal", label = "Raids" },
-        { key = "log5pp", label = "Dungeons" },
+        { key = "logNormal",  label = "Raids" },
+        { key = "logDungeon", label = "Dungeons" },
     }
 end
 
@@ -129,8 +132,10 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
     end -- not IS_FOREVER
 
     ---------------------------------------------------------------------------
-    --  LFG REMINDER
+    --  LFG REMINDER (no dungeon teleports on WoW Forever: the section and the
+    --  reminder runtime behind it do not exist there)
     ---------------------------------------------------------------------------
+    if not EllesmereUI.IS_FOREVER then
     _, h = W:SectionHeader(parent, "LFG REMINDER", y); y = y - h
 
     _, h = W:DualRow(parent, y,
@@ -178,11 +183,11 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
     end   -- close LFG Reminder hidden-while-disabled gate
 
     _, h = W:Spacer(parent, y, 20); y = y - h
+    end -- not IS_FOREVER
 
     ---------------------------------------------------------------------------
     --  AUTO COMBAT LOGGING
     ---------------------------------------------------------------------------
-
     _, h = W:SectionHeader(parent, "AUTO COMBAT LOGGING", y); y = y - h
 
     local trigRow, trigH = W:DualRow(parent, y,
@@ -217,6 +222,10 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
             TRIGGER_ITEMS,
             function(k)
                 local v = Cfg()[k]
+                if v == nil and k == "logDungeon" then
+                    local old = Cfg().log5pp
+                    return old == nil or old == true
+                end
                 if v == nil then return TRIGGER_DEFAULTS[k] end
                 return v
             end,
@@ -261,17 +270,19 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
     _, h = W:Spacer(parent, y, 20); y = y - h
 
     ---------------------------------------------------------------------------
-    --  BATTLE RES
+    --  BATTLE RES (no shared battle res charges on WoW Forever: the indicator
+    --  runtime builds nothing there and the section is not built)
     ---------------------------------------------------------------------------
-    if _G._EUI_BuildBattleResSection then
+    if _G._EUI_BuildBattleResSection and not EllesmereUI.IS_FOREVER then
         local brezH = _G._EUI_BuildBattleResSection(parent, y, W, EllesmereUI.PP)
         y = y - brezH
     end
 
     ---------------------------------------------------------------------------
-    --  BLOODLUST TRACKER
+    --  BLOODLUST TRACKER (no raid-wide lust on WoW Forever: the tracker
+    --  runtime returns at load there and the section is not built)
     ---------------------------------------------------------------------------
-    if _G._EUI_BuildBloodlustSection then
+    if _G._EUI_BuildBloodlustSection and not EllesmereUI.IS_FOREVER then
         local lustH = _G._EUI_BuildBloodlustSection(parent, y, W, EllesmereUI.PP)
         y = y - lustH
     end

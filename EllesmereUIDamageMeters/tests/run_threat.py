@@ -25,6 +25,7 @@ function frameMock()
  function f:Hide() self.shown=false; if self.hooks.OnHide then self.hooks.OnHide() end end
  function f:Show() self.shown=true; if self.hooks.OnShow then self.hooks.OnShow() end end
  function f:IsShown() return self.shown end
+ function f:IsVisible() return self.shown end
  function f:SetShown(v) self.shown=v end
  function f:HookScript(e,fn) self.hooks[e]=fn end
  function f:SetScript(e,fn) self[e]=fn end
@@ -101,6 +102,8 @@ function FormatBarValue(n) return 'DMG '..n end
 function AbbrevNumber(n) return tostring(n) end
 function RecalcViewport(n) viewport.count=n end
 function GetCurrentViewDuration() return 5 end
+function UpdateSATimerText() end
+function ns._DMHiddenDeathsPass() end
 function FormatTimer() return '0:05' end
 C_DamageMeter={GetCombatSessionFromType=function(_,kind)
  damageCalls=damageCalls+1; assert(kind~='THREAT','Threat must never be passed to damage API')
@@ -292,5 +295,18 @@ for i=1,40 do exists['raid'..i]=true;exists['raidpet'..i]=true
 data.player={false,0,80,88,800};data.pet={false,0,20,22,200};cfg.foreverThreat.pets=true
 T.Refresh();assert(W.visibleCount==81 and #W.rowPool==81)
 T.Set('pullBar',false);assert(W.visibleCount==80 and not W.rowPool[81].row.shown)
+-- Upstream hidden-window guards must preserve the custom provider while
+-- preventing damage API fetches until the host becomes visible again.
+W.frame:Hide(); local beforeCalls=damageCalls
+W.curDMType=Enum.DamageMeterType.DamageDone; W.Refresh()
+assert(damageCalls==beforeCalls and W._refreshPending)
+W.frame:Show(); W.Refresh(); assert(damageCalls>beforeCalls)
 print('PASS: absorbed focus/friendly sources, pet toggle, Tank%/raw/native secret text, readable pull line and 81-row pool, report isolation, warning edges/roles/protection, persisted menu and preview lifecycle')
 """)
+# Official v9.3.4 also offers Threat. With our provider loaded, its bridge
+# must stand down before allocating frames, registering login or publishing
+# a second metric. Existing official Essentials remains the standalone fallback.
+lua.execute("CreateFrame=function() error('duplicate official Threat bridge allocated a frame') end; EllesmereUI.IS_FOREVER=true")
+lua.execute((root/'EllesmereUIDamageMeters_ForeverThreat.lua').read_text(encoding='utf-8-sig'),'EllesmereUIDamageMeters',lua.globals().ns)
+assert lua.globals().ns.DMThreatSession is None
+print('PASS: official Threat bridge stands down; hidden damage windows fetch only after showing')

@@ -20,7 +20,7 @@ lua = LuaRuntime(unpack_returned_tuples=True)
 lua.globals().RESET_HELPER_SOURCE = source[start:end]
 # Exercise the installed house popup's real dismissal handlers, so the modal
 # regression checks do not duplicate their implementation in the test mock.
-core = (root.parent / "EllesmereUI/EllesmereUI.lua").read_text(encoding="utf-8-sig")
+core = (root.parent / "EllesmereUI/EllesmereUI_Popups.lua").read_text(encoding="utf-8-sig")
 compile_lua(core, "EllesmereUI.lua")
 escape_start = core.index("local function WirePopupEscape(")
 escape_end = core.index("local function CreateConfirmPopup()", escape_start)

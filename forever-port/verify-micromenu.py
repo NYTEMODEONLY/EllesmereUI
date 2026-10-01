@@ -7,9 +7,9 @@ from pathlib import Path
 from lupa.lua51 import LuaRuntime
 ROOT=Path(__file__).resolve().parents[2]
 pack=(ROOT/'EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_WindowPacks.lua').read_text(encoding='utf-8')
-section=pack[pack.index('local MICRO_BUTTONS = {'):pack.index('--  Dressing Room (DressUpFrame)')]
+section='do\n'+pack[pack.index('local MICRO_BUTTONS = {'):pack.index('--  Dressing Room (DressUpFrame)')]
 options=(ROOT/'EllesmereUIOptions/EUI_BlizzardSkin_Options.lua').read_text(encoding='utf-8')
-a=options.index("    -- WoW Forever keeps Blizzard's micro menu art:")
+a=options.index("    -- WoW Forever drops the cards")
 card_filter=options[a:options.index('    local function ',a)]
 for combat in (False,True):
  for preference in ('true','false','nil'):
@@ -53,6 +53,7 @@ lua=LuaRuntime()
 lua.execute('''
 EllesmereUI={IS_FOREVER=false}; Theme={bgR=.08,bgG=.08,bgB=.08}
 combat=true; hooks=0; passes=0; timers={}
+ns={CombatQueue={Defer=function(_,fn) callback=function() unregistered=true; fn() end end}}
 function InCombatLockdown() return combat end
 WSkin={RegisterWindow=function(e) entry=e end}
 function CreateFrame()

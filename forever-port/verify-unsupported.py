@@ -75,11 +75,11 @@ print('PASS: old/imported Vault and crest blocks removed without losing settings
 # Actual options builder and runtime share the two Forever logging trigger keys.
 logging_options = source('EllesmereUIOptions/EUI_QoL_AutoLogging_Options.lua')
 lua.execute(logging_options[logging_options.index('local TRIGGER_ITEMS ='):logging_options.index('local function Cfg()')] + '''
-assert(#TRIGGER_ITEMS == 2 and TRIGGER_ITEMS[1].key == "logNormal" and TRIGGER_ITEMS[2].key == "log5pp")
+assert(#TRIGGER_ITEMS == 2 and TRIGGER_ITEMS[1].key == "logNormal" and TRIGGER_ITEMS[2].key == "logDungeon")
 ''')
 lua = LuaRuntime()
 lua.execute('''
-    EUI_FOREVER = true
+    EUI_FOREVER = true; EllesmereUI={IS_FOREVER=true}
     EllesmereUIDB = {autoLogging={enabled=true,delaystop=false}}
     frames={}
     function CreateFrame()
@@ -109,7 +109,7 @@ lua.execute('''
     zoneType="arena"; _EUI_AutoLogging_Check(); assert(not logging)
     EllesmereUIDB.autoLogging.enabled=false; _EUI_AutoLogging_Check()
     assert(not frames[1].events.ZONE_CHANGED_NEW_AREA)
-    EUI_FOREVER=false; EllesmereUIDB.autoLogging={enabled=true,delaystop=false}
+    EUI_FOREVER=false; EllesmereUI.IS_FOREVER=false; EllesmereUIDB.autoLogging={enabled=true,delaystop=false}
     zoneType="party"; diff=8; mapID=1594; _EUI_AutoLogging_Check(); assert(logging)
     diff=1; mapID=33; _EUI_AutoLogging_Check(); assert(not logging)
 ''')

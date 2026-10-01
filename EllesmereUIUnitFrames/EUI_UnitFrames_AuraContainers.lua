@@ -834,8 +834,10 @@ local function PlayerBuffChain(s)
             for filterId in pairs(s.buffNegFilters) do
                 local f = ns.PAB_GetFilter and ns.PAB_GetFilter(filterId)
                 if f and f.spells then
+                    -- Ids a preset keeps only for the other client never count
+                    -- here (ns.PAB_OtherClientSpell), same as on Player Aura Bars.
                     for id, on in pairs(f.spells) do
-                        if on then
+                        if on and not ns.PAB_OtherClientSpell(f, id) then
                             ex = ex or {}
                             ex[id] = true
                             ExpandBuffFamily(ex, id, f.spells)
@@ -872,7 +874,7 @@ local function PlayerBuffChain(s)
             local f = ns.PAB_GetFilter and ns.PAB_GetFilter(filterId)
             if f and f.spells then
                 for id, on in pairs(f.spells) do
-                    if on then
+                    if on and not ns.PAB_OtherClientSpell(f, id) then
                         inc = inc or {}
                         if not inc[id] then
                             inc[id] = true
@@ -902,7 +904,7 @@ local function PlayerBuffChain(s)
             local f = ns.PAB_GetFilter and ns.PAB_GetFilter(filterId)
             if f and f.spells then
                 for id, on in pairs(f.spells) do
-                    if on then
+                    if on and not ns.PAB_OtherClientSpell(f, id) then
                         hide[id] = true
                         ExpandBuffFamily(hide, id, f.spells)
                     end
@@ -1065,7 +1067,21 @@ end
 -- nothing when its picks can never match.
 local function PlayerDebuffChain(s)
     EnsurePlayerAuraLanes(s)
-    if s.debuffShowAll == false then
+    -- Has Duration checked with no Show pick is the timed catch-all (Player Aura
+    -- Bars parity): the All Debuffs path below, narrowed by ChainFor.
+    local durAlone = false
+    if s.debuffShowAll == false and s.debuffHasDuration == true then
+        durAlone = true
+        for i = 1, #TOKEN_CLASSES do
+            if ClassEnabled(TOKEN_CLASSES[i], false, s, "player") then durAlone = false break end
+        end
+        if durAlone then
+            for i = 1, #CANDIDATE_CLASSES do
+                if ClassEnabled(CANDIDATE_CLASSES[i], false, s, "player") then durAlone = false break end
+            end
+        end
+    end
+    if s.debuffShowAll == false and not durAlone then
         local matchOn, link = PlayerDebuffMatch(s)
         if matchOn then return { link } end
         return BuildChain("HARMFUL", false, s, "player")
@@ -1120,6 +1136,60 @@ local function PlayerDebuffChain(s)
     for n = 1, #negations do allTokens[#allTokens + 1] = negations[n] end
     chain[#chain + 1] = { key = "pdall|" .. table.concat(allTokens, "") .. "|" .. CandFP(cand),
         tokens = allTokens, cand = cand }
+    return chain
+end
+
+-- An element's chain. Has Duration (s.debuffHasDuration on every unit,
+-- s.buffDurOnly on target/focus/boss -- its own key: the player's broad-mode
+-- s.buffHasDuration, run inside PlayerBuffChain, can already sit copied on
+-- those units) is an AND-modifier on every link that shows content:
+-- Blizzard's candidate maxDuration check, which drops an aura when
+-- `duration > maxDuration or duration == 0`, so math.huge drops only the
+-- permanent ones. The container evaluates it and it is not identity-gated,
+-- so it holds on any unit, friendly or hostile, secret or not. Hide-lane links
+-- (they render nothing) and Tracked Auras include links (explicit always-show
+-- spells) keep their payload. A narrowed link's key gains "|dur", so the
+-- variant declares fresh and the plain one parks at 0.
+local function ChainFor(unit, base, s)
+    local isBuff = base == "HELPFUL"
+    local chain
+    if unit == "player" and isBuff then
+        return PlayerBuffChain(s)
+    elseif unit == "player" then
+        chain = PlayerDebuffChain(s)
+    else
+        chain = BuildChain(base, isBuff, s, unit)
+    end
+    local dur
+    if isBuff then dur = s.buffDurOnly == true else dur = s.debuffHasDuration == true end
+    if not dur then return chain end
+    -- Non-player buffs with nothing shown or hidden run the plain show-all
+    -- group (ApplyGroupConfig); narrowed, it becomes an explicit link.
+    if isBuff and #chain == 0 then
+        chain[1] = { key = "all", tokens = { base } }
+    end
+    -- Show All's catch-all is what shows the Tracked Auras there (no include
+    -- links); narrowed, they get one include link of their own, from any
+    -- caster as the catch-all showed them, at any duration.
+    if not isBuff and unit ~= "player" and DebuffFilterMode(s) == "all" and HasActiveIncludes(s) then
+        local m = {}
+        for id, v in pairs(s.debuffInclude) do
+            if v then m[id] = true end
+        end
+        chain[#chain + 1] = { key = "incall|" .. CandFP({ includeSpellIDs = m }),
+            tokens = { "HARMFUL" }, cand = { includeSpellIDs = m, excludeSpellIDs = {} }, inc = true }
+    end
+    for i = 1, #chain do
+        local c = chain[i]
+        if not (c.hidden or c.inc) then
+            local cand = { maxDuration = math.huge }
+            if c.cand then
+                for k, v in pairs(c.cand) do cand[k] = v end
+                if cand.maxDuration == nil then cand.maxDuration = math.huge end
+            end
+            chain[i] = { key = c.key .. "|dur", tokens = c.tokens, cand = cand, glow = c.glow, mine = c.mine }
+        end
+    end
     return chain
 end
 
@@ -1511,8 +1581,8 @@ end
 
 function PurgeGlow.Extra(button, d, style)
     ApplyUFText(button, d, style)
+    if not style.purgeSpec then return end
     local Glows = EllesmereUI.Glows
-    if not (Glows and Glows.StartEngineGlow) then return end
     local host = d.ufPurgeGlow
     if not host then
         -- The first call runs inside initializeFrame, the button's one legal
@@ -1526,35 +1596,33 @@ function PurgeGlow.Extra(button, d, style)
         end
         host:EnableMouse(false)
         d.ufPurgeGlow = host
+        -- nil need: every family (Pixel, the flipbooks and Blizzard Border).
+        Glows.PrewarmEngineHost(host, style.width, style.height, nil)
     end
-    local g, w, h = style.purgeGlow, style.width, style.height
-    local cr, cg, cb = style.purgeR, style.purgeG, style.purgeB
-    -- Blizzard Border: Blizzard's static stealable art instead of a glow.
-    if g == Glows.STEALABLE_BORDER then
-        if host._pgS ~= g or host._pgW ~= w or host._pgH ~= h
-           or host._pgR ~= cr or host._pgG ~= cg or host._pgB ~= cb then
-            if host._euiGlowActive then Glows.StopGlow(host) end
-            host:SetAlpha(1)
-            Glows.ShowStealableBorder(host, w, h, cr, cg, cb)
-            host._pgBorder = true
-            host._pgS, host._pgW, host._pgH = g, w, h
-            host._pgR, host._pgG, host._pgB = cr, cg, cb
-        end
-        return
-    end
-    if host._pgBorder then
-        Glows.HideStealableBorder(host)
-        host._pgBorder = nil
-    end
-    if (not host._euiGlowActive) or host._pgS ~= g or host._pgW ~= w or host._pgH ~= h
-       or host._pgR ~= cr or host._pgG ~= cg or host._pgB ~= cb then
-        -- C-side animations only (engine-button subtree); nil color = the
-        -- style's default look.
-        Glows.StartEngineGlow(host, g, w, cr, cg, cb, nil, h)
-        host._pgS, host._pgW, host._pgH = g, w, h
-        host._pgR, host._pgG, host._pgB = cr, cg, cb
-    end
+    -- C-side animations only (engine-button subtree); Blizzard Border
+    -- (static stealable art) renders through the same call.
+    Glows.StartSpecGlow(host, style.purgeSpec, style.width, style.height, "engine")
 end
+
+-- Unset color = "default" mode: the suite's default look (gold).
+function PurgeGlow.Spec(s)
+    local c = s.buffPurgeGlowColor
+    local mode = s.buffPurgeGlowColorMode or (c and "custom" or "default")
+    local bgc = s.buffPurgeGlowBackgroundColor
+    local spec = {
+        style = s.buffPurgeGlow,
+        lines = s.buffPurgeGlowLines, thickness = s.buffPurgeGlowThickness,
+        speed = s.buffPurgeGlowSpeed,
+        bg = s.buffPurgeGlowBackground == true or nil,
+        bgR = bgc and bgc.r, bgG = bgc and bgc.g, bgB = bgc and bgc.b,
+    }
+    spec.r, spec.g, spec.b = EllesmereUI.Glows.ResolveColor(mode, c and c.r, c and c.g, c and c.b)
+    -- Class mode: the palette colour this spec (and Register's print) holds,
+    -- for the colours-changed hook below the reload.
+    if mode == "class" then PurgeGlow.ccR, PurgeGlow.ccG, PurgeGlow.ccB = spec.r, spec.g, spec.b end
+    return spec
+end
+ns.UF_PurgeGlowSpec = PurgeGlow.Spec
 
 -- Registers (and restyles on a fingerprint change) the glow style while the
 -- glow is on. Runs before any glow group is declared: initializeFrame
@@ -1563,11 +1631,11 @@ function PurgeGlow.Register(unit, s, frame, font)
     if not PurgeGlow.On(unit, s) then return end
     local key = PurgeGlow.StyleKey(unit)
     local style = BuildStyle(unit, "HELPFUL", s, frame)
-    local c = s.buffPurgeGlowColor
-    style.purgeGlow = s.buffPurgeGlow
-    style.purgeR, style.purgeG, style.purgeB = c and c.r, c and c.g, c and c.b
+    local sp = PurgeGlow.Spec(s)
+    style.purgeSpec = sp
     style.applyExtra = PurgeGlow.Extra
-    local v = StyleTableFP(style, font) .. "|" .. FP(style.purgeGlow, style.purgeR, style.purgeG, style.purgeB)
+    local v = StyleTableFP(style, font) .. "|" .. FP(sp.style, sp.r, sp.g, sp.b, sp.lines,
+        sp.thickness, sp.speed, sp.bg, sp.bgR, sp.bgG, sp.bgB)
     local st = ufFP[key]
     if not st then st = {}; ufFP[key] = st end
     if st.style ~= v then
@@ -2791,14 +2859,7 @@ function ns.UF_ReloadAuraContainers(frame, unit)
         -- probe T1/T1b), and the config pass zeroes whatever fell out of the active
         -- set. The old swap path permanently leaked a 10-button batch per group per
         -- toggle (engine frames are never freed).
-        local chain
-        if unit == "player" and base == "HELPFUL" then
-            chain = PlayerBuffChain(s)
-        elseif unit == "player" then
-            chain = PlayerDebuffChain(s)
-        else
-            chain = BuildChain(base, base == "HELPFUL", s, unit)
-        end
+        local chain = ChainFor(unit, base, s)
         local sig = ChainSignature(chain)
         local force = forceCfg
         local container = entry[field]
@@ -2900,7 +2961,6 @@ local unitWatcher = CreateFrame("Frame")
 unitWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
 unitWatcher:RegisterEvent("PLAYER_FOCUS_CHANGED")
 unitWatcher:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT")
-unitWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
 unitWatcher:SetScript("OnEvent", function(_, event)
     -- The Tracked Auras gate first (a friendly/hostile flip re-configures the
     -- debuff groups), then the one re-parse.
@@ -2912,14 +2972,6 @@ unitWatcher:SetScript("OnEvent", function(_, event)
         IncGate.Apply("focus", true)
         PurgeGlow.Check("focus", true)
         RefreshUnit("focus")
-    elseif event == "PLAYER_REGEN_ENABLED" then
-        -- Filter-set swaps requested during combat run now.
-        for unitKey, entry in pairs(registry) do
-            if entry.pendingSwap then
-                entry.pendingSwap = nil
-                ns.UF_ReloadAuraContainers(entry.frame, unitKey)
-            end
-        end
     else
         for i = 1, 5 do RefreshUnit("boss" .. i) end
     end
@@ -2934,6 +2986,29 @@ function ns.UF_ReloadAllAuraContainers()
             ns.UF_ReloadAuraContainers(entry.frame, unitKey)
         end
     end
+end
+
+-- Colors page edits (swatches, darken, resets, profile switches) all end in
+-- ApplyColorsToOUF. Once a Class-mode purge glow was built, a changed class
+-- colour re-runs the reload; the purge print carries the colour, so only
+-- that glow style restyles. Calls in one frame (a profile switch can make
+-- two) collapse into one check on the next frame: the flush frame stays
+-- hidden until a call and hides itself before working.
+do
+    local flush = CreateFrame("Frame")
+    flush:Hide()
+    flush:SetScript("OnUpdate", function(self)
+        self:Hide()
+        local r0 = PurgeGlow.ccR
+        if r0 == nil then return end
+        local r, g, b = EllesmereUI.Glows.ResolveColor("class")
+        if r ~= r0 or g ~= PurgeGlow.ccG or b ~= PurgeGlow.ccB then
+            ns.UF_ReloadAllAuraContainers()
+        end
+    end)
+    hooksecurefunc(EllesmereUI, "ApplyColorsToOUF", function()
+        if PurgeGlow.ccR ~= nil then flush:Show() end
+    end)
 end
 
 -- Cast bar settle: the bar's saved position is applied by the unlock system's
@@ -3040,14 +3115,7 @@ local function BuildUnitContainers(frame, unit)
     -- atom).
     for e = 1, 2 do
         local base, field = ELEMENT_ORDER[e][1], ELEMENT_ORDER[e][2]
-        local chain
-        if unit == "player" and base == "HELPFUL" then
-            chain = PlayerBuffChain(s)
-        elseif unit == "player" then
-            chain = PlayerDebuffChain(s)
-        else
-            chain = BuildChain(base, base == "HELPFUL", s, unit)
-        end
+        local chain = ChainFor(unit, base, s)
         local declared = entry.groups[field]
         local styleKey = StyleKey(unit, base)
         if not declared.all then

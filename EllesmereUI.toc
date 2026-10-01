@@ -1,8 +1,8 @@
 ## Interface: 120000, 120001, 120005, 120007, 120100, 16001
 ## Title: |cff0cd29fEllesmereUI Forever|r
-## Notes: EllesmereUI 9.3 with preserved local Forever enhancements
+## Notes: EllesmereUI 9.3.4 with preserved local Forever enhancements
 ## Author: Ellesmere
-## Version: 9.3-forever.0.4.0
+## Version: 9.3.4-forever.0.5.0
 ## SavedVariables: EllesmereUIDB
 ## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga
 ## X-Curse-Project-ID: 1477613
@@ -43,7 +43,15 @@ EllesmereUI_Migration.lua
 EllesmereUI_Startup.lua
 
 # Shared EllesmereUI Files
+EllesmereUI_PixelPerfect.lua
 EllesmereUI.lua
+EllesmereUI_Panel.lua
+EllesmereUI_VisibilityRules.lua
+EllesmereUI_SharedHelpers.lua
+EllesmereUI_Popups.lua
+EllesmereUI_Colors.lua
+EllesmereUI_Fonts.lua
+EllesmereUI_ProfileSync.lua
 EllesmereUI_RetailAtlas.lua
 EllesmereUI_BuffPresets.lua
 EllesmereUI_UICore.lua
@@ -66,6 +74,7 @@ EllesmereUI_AuraKit.lua
 EllesmereUI_WarriorCharges.lua
 EllesmereUI_ManaRegenSpark.lua
 # Personal layout is owned by the local native adapters: EllesmereUI_ForeverLayout.lua
+EllesmereUI_SpellCostPrediction.lua
 EllesmereUI_FirstInstall.lua
 EllesmereUI_RaidFramesPopup.lua
 EllesmereUI_PatchNotesPopup.lua

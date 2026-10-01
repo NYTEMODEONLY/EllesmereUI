@@ -1,5 +1,32 @@
 # Custom release history
 
+## 9.3.4-forever.0.5.0 — October 1, 2026
+
+Integrate official complete-suite v9.3.4, including changes from v9.3.1–9.3.4.
+Upstream base: `de88c8670d7ccc308ff96eeda0265f7f468aaaf4`.
+
+- Use the official multi-stop flight route, preview and optional early landing;
+  retain bounded Forever takeoff detection and elapsed-only mid-flight recovery.
+- Preserve ChatMeters embedding and the custom Threat metric, reports, controls,
+  selections and native protected-value rendering. The new official Threat bridge
+  stands down while the custom provider owns the metric.
+- Integrate the official core/options file splits, shared combat queue, meter
+  visibility performance, resource prediction/regen, ranked HoverCast, group and
+  nameplate fixes. Move local popup fixes to the new official popup module.
+- Make new group level/missing-buff visuals opt-in; preserve native group fallback
+  exclusivity, existing appearance, skins, positions, profiles and saved choices.
+- Retain native Group Finder/Housing skin controls, native endpoints, bag/bank
+  protections, reminders and official supported-unit prediction ownership.
+- Preserve dungeon logging preferences across the upstream option rename.
+- Keep Grimlight Meters Tab independently versioned `v0.4.0` and retain credits,
+  artwork and license boundaries. Public builds omit personal profiles/settings.
+
+The installed suite passes all 52 active regression scripts and Lua 5.1
+compilation; disposable updater/rollback checks pass. Public ZIP hashes, manifest
+references and private-profile exclusion are checked separately. In-game startup,
+flight routes, embedded meters, group combat, native windows and persistence remain
+pending player acceptance. See [the integration audit](docs/UPSTREAM_9.3.4.md).
+
 ## Grimlight companion release format - October 1, 2026
 
 The custom Grimlight Meters Tab companion now declares `v0.4.0`, following the

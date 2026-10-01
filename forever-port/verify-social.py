@@ -44,6 +44,7 @@ function InCombatLockdown() return combat end
 function IsInInstance() return false, 'none' end
 function QueueApplyAll() queued=queued+1 end
 function SkinFriendsFrame() skins=skins+1 end
+function PaintChrome() end -- visual helper tested separately; lifecycle assertions retained
 function GetBorderColor() return 0,0,0,1 end
 PP={UpdateBorder=function() end,SetBorderColor=function() end}
 function GetFFD() return {} end
@@ -99,16 +100,16 @@ SocialUIFrame=nil; combat=true; ApplyOwner(); assert(queued==1 and skins==1)
 combat=false; ApplyOwner(); assert(skins==2)
 
 -- Already-loaded owner path and initially disabled addon remain distinct.
-frames={}; timers={}; EBS:OnEnable(); assert(skins==4)
+frames={}; timers={}; EBS:OnEnable(); assert(skins==3)
 EBS.db.profile.friends.enabled=false; frames={}; timers={}; FriendsFrame=nil
-EBS:OnEnable(); assert(skins==4 and EBS.db.profile.friends.enabled==false)
+EBS:OnEnable(); assert(skins==3 and EBS.db.profile.friends.enabled==false)
 for _,f in ipairs(frames) do assert(not f.events.ADDON_LOADED) end
 
 -- Existing Retail enable policy and SocialUI LOD path are unchanged.
 EUI_FOREVER=false; featureEnabled=false; frames={}; timers={}
 EBS:OnEnable(); assert(EBS.db.profile.friends.enabled==true)
-FriendsFrame=CreateFrame(); event('ADDON_LOADED','Blizzard_FriendsFrame'); flush(); assert(skins==4)
-event('ADDON_LOADED','Blizzard_SocialUI'); flush(); assert(skins==5)
+FriendsFrame=CreateFrame(); event('ADDON_LOADED','Blizzard_FriendsFrame'); flush(); assert(skins==3)
+event('ADDON_LOADED','Blizzard_SocialUI'); flush(); assert(skins==4)
 featureEnabled=true; assert(LegacyGate())
 ''')
 

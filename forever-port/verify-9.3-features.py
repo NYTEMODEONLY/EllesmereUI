@@ -33,7 +33,7 @@ for block in ('Crests','GreatVault'):
     lua.execute(source('EllesmereUIDataBars/Blocks/'+block+'.lua'),'DataBars',lua.globals().ns)
 assert lua.globals().ns.BlockFactories.crests is None and lua.globals().ns.BlockFactories.greatvault is None
 travel=source('EllesmereUIDataBars/Blocks/Travel.lua')
-assert 'not EUI_FOREVER and D().clickableTeleports ~= false' in travel
+assert 'not EllesmereUI.IS_FOREVER and D().clickableTeleports ~= false' in travel
 ilvl=source('EllesmereUIDataBars/Blocks/ItemLevel.lua')
 assert 'CharacterMicroButton' in ilvl and 'combatlock' in ilvl and 'PLAYER_REGEN_ENABLED' in ilvl
 print('PASS: production split menu has unique native endpoints, false settings survive; unsupported blocks inactive; secure ilvl entry retained')

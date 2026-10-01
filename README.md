@@ -4,8 +4,8 @@ A maintained custom version of [EllesmereUI](https://github.com/EllesmereGaming/
 for **WoW Forever**, with chat-embedded meters, integrated threat, expanded native
 window support, safer bag operations and Forever-specific fixes.
 
-**Current custom baseline: 9.3-forever.0.4.0**, based on the official complete-suite
-**v9.3** release. This is an independently maintained fork, not an official
+**Current custom baseline: 9.3.4-forever.0.5.0**, based on the official complete-suite
+[**v9.3.4** release](https://github.com/EllesmereGaming/EllesmereUI/releases/tag/v9.3.4). This is an independently maintained fork, not an official
 EllesmereUI release. The target is Forever's interface **16001** (16000–19999
 client family); this custom distribution is not validated for Retail or other
 Classic clients.
@@ -97,7 +97,8 @@ is intentionally removed.
 
 ### Flight timer, groups and unit frames
 
-- **Flight timer:** the official timer has a local takeoff-detection fix for delayed
+- **Flight timer:** the official v9.3.4 route track includes multi-stop labels,
+  route preview and optional early landing. It retains a local takeoff-detection fix for delayed
   taxi state or missing control events. It checks briefly after a taxi click,
   avoids idle polling and duplicate starts, and cleans up on disable. Enabling or
   reloading mid-flight shows elapsed time since detection without inventing a
@@ -105,6 +106,8 @@ is intentionally removed.
   exclusion and Frequent Flier adjustment remain.
 - **Party/raid:** the owner's installation uses the full official renderer with
   party/raid options, previews, aura managers, click casting and party targets/pets.
+  New official level text and missing-buff indicators are available and default
+  off to preserve the previous appearance. Existing explicit choices remain.
   The optional native fallback remains available. EUI Unlock Mode owns official
   positions; Blizzard Edit Mode owns native-fallback positions.
 - **Heal/shield prediction:** official player/target/focus prediction owns supported
@@ -122,11 +125,16 @@ Chat sidebar plates, Report/Threat header icons, report dialogs, fonts, hover,
 pressed and selected states use the host renderer. Chat style, meter style,
 options-panel theme, accent and native-window skin choices remain independent.
 
-Official v9.3 features such as controller support, optional Forever artwork /
+Official v9.3–9.3.4 features such as controller support, optional Forever artwork /
 PapaPixels controls, party targets/pets, reminder growth direction, mana spark,
 resource-bar swing timers and compatible fixes remain integrated. These are
 official features, not claims of new work by this fork. The owner's Forever
 options theme and cyan accent are preserved locally, not imposed on downloaders.
+
+The latest integration also brings official shared combat deferral, resource mana
+prediction/regen, ranked HoverCast and group fixes, nameplate text slots and meter
+visibility optimizations. See the [upstream integration audit](docs/UPSTREAM_9.3.4.md)
+for feature ownership and preservation decisions.
 
 ### Compatibility and diagnostics
 
@@ -144,7 +152,7 @@ local; nothing is automatically uploaded. A crash can lose unsaved reports.
 
 ## Install or update
 
-1. Download the **EllesmereUI-9.3-forever.0.4.0.zip** release asset (or the matching
+1. Download the **EllesmereUI-9.3.4-forever.0.5.0.zip** release asset (or the matching
    asset from a later release). GitHub's automatic source archives are developer
    checkouts, not ready-to-copy AddOns packages.
 2. Back up your current suite and settings. For a complete package replacement,
@@ -184,8 +192,8 @@ and use this repository's releases for the published custom build.
 
 ## Verification and release policy
 
-The installed baseline passed **50 active regression scripts and Lua 5.1
-compilation** on September 27, 2026. Public packaging additionally checks hashes,
+The installed update passed **52 active regression scripts and Lua 5.1
+compilation** on October 1, 2026. Public packaging additionally checks hashes,
 load references and private-profile exclusion. Some source tests require the
 owner's private profile or separately preserved native fixtures; see maintenance
 notes rather than treating missing dependencies as passed tests.

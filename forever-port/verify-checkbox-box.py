@@ -24,7 +24,7 @@ def between(text, start, end):
 
 
 checkbox = between(engine, "function WSkin.Checkbox(cb, opts)", "-- Modern dropdown / legacy selector")
-guild_check = between(packs, "local function SkinGuildCheck(cb)", "-- Max/Min glyph matching")
+guild_check = between(packs, "local function SkinGuildCheck(cb)", "-- Side tab (Chat/Roster/Benefits/Info)")
 
 MOCKS = r'''
 WSkin={}; Theme={accR=.1,accG=.8,accB=.6}; FFD={}; secret={}

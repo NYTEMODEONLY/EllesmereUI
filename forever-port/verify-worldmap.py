@@ -12,6 +12,8 @@ source = PACK.read_text(encoding="utf-8")
 start = source.index("local function Skin_WorldMap()")
 end = source.index("--  Micro Menu & Bags.", start)
 section = source[start:end]
+# Upstream wraps each pack in do/end; include its opening scope.
+section = "do\n" + section
 lua = LuaRuntime()
 lua.execute(r'''
 EUI_FOREVER=true
