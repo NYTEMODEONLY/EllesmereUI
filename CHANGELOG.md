@@ -2,6 +2,8 @@
 
 ## Source preservation and Meters artwork - October 1, 2026
 
+Preserve the companion’s already-installed Grimlight identity and owner credit;
+the earlier public source still used its retail custom-companion label.
 The Meters companion now uses the selected AI-generated illustrated icon for
 the addon list and its existing sidebar slot. Versions, runtime behavior and
 saved declarations are unchanged; native rendering awaits player acceptance.
