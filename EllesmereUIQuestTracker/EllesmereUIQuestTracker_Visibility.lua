@@ -26,6 +26,18 @@ local _bgFrame
 
 local function GetTracker() return _G.ObjectiveTrackerFrame end
 
+-- Read the loaded addon's active profile, never its saved profile snapshot or
+-- frame visibility: a collapsed/temporarily hidden Questie tracker still owns
+-- quest tracking. Leave EUI's preferences intact so disabling Questie restores
+-- the player's existing EUI tracker configuration.
+local function QuestieOwnsTracker()
+    local questie = _G.Questie
+    local profile = questie and questie.db and questie.db.profile
+    return profile and profile.trackerEnabled == true
+        and (not questie.IsEnabled or questie:IsEnabled()) or false
+end
+EQT.QuestieOwnsTracker = QuestieOwnsTracker
+
 -- BG and top accent divider anchor directly to the tracker's own top edge. The custom
 -- top-module-padding system (and the EQT.TOP_ANCHOR_OFFSET it used to publish) was
 -- removed from Skin.lua -- Blizzard's own default topModulePadding now governs the
@@ -91,6 +103,7 @@ end
 -- the BG to flicker back in during combat.
 local function TrackerIsVisible(otf)
     if not otf then return false end
+    if QuestieOwnsTracker() then return false end
     if not otf:IsShown() then return false end
     if otf:GetAlpha() <= 0 then return false end
     if ShouldAutoHide() then return false end
@@ -166,6 +179,10 @@ local function InstallShowHook()
     -- Raid/arena auto-hide. Runs before other Show hooks (hooksecurefunc
     -- stacks); the M+ timer installs its own similar hook for M+.
     hooksecurefunc(otf, "Show", function(self)
+        if QuestieOwnsTracker() then
+            if EQT.UpdateVisibility then EQT.UpdateVisibility() end
+            return
+        end
         if _eqtSuppressed then return end
         if ShouldAutoHide() then HardHide(self) end
     end)
@@ -185,6 +202,16 @@ local function UpdateVisibility()
     InstallShowHook()
     local otf = GetTracker()
     if not otf then return end
+
+    -- Questie controls native Show/Hide itself. Do not resurrect or hard-hide
+    -- its managed frame (including in combat); only suppress our presentation
+    -- and named click sinks through the existing visibility mechanism.
+    if QuestieOwnsTracker() then
+        otf:SetAlpha(0)
+        if EQT.ApplyTrackerMouse then EQT.ApplyTrackerMouse(false) end
+        if _bgFrame then _bgFrame:Hide() end
+        return
+    end
 
     -- Raid/arena auto-hide takes precedence and uses a hard Hide(); the
     -- Show-hook re-hides if Blizzard tries to bring it back.
@@ -234,6 +261,44 @@ local function UpdateVisibility()
     if EQT.ResizeBGToContent then EQT.ResizeBGToContent() end
 end
 EQT.UpdateVisibility = UpdateVisibility
+
+local _questieHooked, _questieTrackerHooked = false, false
+local function RefreshQuestieOwnership()
+    -- Questie's reload-free Toggle/profile paths can leave its native hide
+    -- request latched. Release that request through its own API before EUI
+    -- restores visibility; otherwise Questie's OnShow hook hides it again.
+    if Questie and Questie.IsForever and QuestieLoader and not QuestieOwnsTracker() then
+        local compat = QuestieLoader:ImportModule("QuestieCompat")
+        if compat and type(compat.ShowWatchFrame) == "function" then
+            compat.ShowWatchFrame()
+        end
+    end
+    UpdateVisibility()
+end
+
+local function HookQuestieTracker()
+    if _questieTrackerHooked or not QuestieLoader then return end
+    local tracker = QuestieLoader:ImportModule("QuestieTracker")
+    if not tracker or type(tracker.Toggle) ~= "function" then return end
+    _questieTrackerHooked = true
+    hooksecurefunc(tracker, "Toggle", RefreshQuestieOwnership)
+    UpdateVisibility()
+end
+
+local function HookQuestieOwnership()
+    local questie = _G.Questie
+    if _questieHooked or not questie or not questie.db then return end
+    _questieHooked = true
+    for _, method in ipairs({"OnEnable", "OnDisable", "RefreshConfig"}) do
+        if type(questie[method]) == "function" then
+            hooksecurefunc(questie, method, RefreshQuestieOwnership)
+        end
+    end
+    if questie.API and type(questie.API.RegisterOnReady) == "function" then
+        questie.API.RegisterOnReady(HookQuestieTracker)
+    end
+    UpdateVisibility()
+end
 
 -- Kept as a no-op so the options-refresh path that used to trigger a state-
 -- driver rebuild doesn't error.
@@ -490,7 +555,13 @@ function EQT.InitVisibility()
     evt:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     evt:RegisterEvent("ENCOUNTER_START")
     evt:RegisterEvent("ENCOUNTER_END")
+    evt:RegisterEvent("ADDON_LOADED")
     evt:SetScript("OnEvent", function(_, event)
+        if event == "ADDON_LOADED" then
+            HookQuestieOwnership()
+            UpdateVisibility()
+            return
+        end
         if event == "ENCOUNTER_START" then
             _inEncounter = true
         elseif event == "ENCOUNTER_END" then
@@ -505,6 +576,7 @@ function EQT.InitVisibility()
         UpdateVisibility()
         SyncBGToTracker()
     end)
+    HookQuestieOwnership()
 
     -- Register with the shared visibility dispatcher for combat/mount
     -- visibility modes. Bails immediately when suppressed (M+/raid).
@@ -536,6 +608,7 @@ function EQT.InitVisibility()
             return 1
         end
         moProxy.SetAlpha = function(_, a)
+            if QuestieOwnsTracker() then a = 0 end
             if otf then otf:SetAlpha(a) end
             if _bgFrame then _bgFrame:SetAlpha(a) end
             if EQT.ApplyTrackerMouse then EQT.ApplyTrackerMouse((a or 0) > 0) end
@@ -546,6 +619,7 @@ function EQT.InitVisibility()
         -- brings back the tracker without its background. Hide() stays alpha-only; the
         -- next resize pass re-hides the frame cleanly.
         moProxy.Show = function()
+            if QuestieOwnsTracker() then return end
             if _bgFrame then _bgFrame:Show() end
             if EQT.ApplyTrackerMouse then EQT.ApplyTrackerMouse(true) end
         end
@@ -556,6 +630,7 @@ function EQT.InitVisibility()
         end
         moProxy.EnableMouse = function() end
         EllesmereUI.RegisterMouseoverTarget(moProxy, function()
+            if QuestieOwnsTracker() then return false end
             if ShouldAutoHide() then return false end
             if _eqtSuppressed then return false end
             -- Hover-gated sets only reveal while their conditions pass; a

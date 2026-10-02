@@ -1,5 +1,17 @@
 # Custom release history
 
+## Unreleased maintenance — October 2, 2026
+
+- Give Questie's enabled tracker priority over the EUI quest tracker. Suppress
+  native tracker presentation, click sinks and EUI chrome while Questie owns
+  tracking, including hover and native re-show paths. Retain EUI settings and
+  anchors for fallback when Questie's tracker is disabled. Observe Questie
+  readiness, profile changes and tracker toggles without additional polling.
+- All 53 active regression scripts and suite Lua 5.1 compilation pass, including
+  the new priority test and existing native tracker anchoring test. Player-run
+  reload, native rendering, hover and combat/taint acceptance remain pending.
+- Routine fix; upstream and custom baseline version declarations stay unchanged.
+
 ## 9.3.4-forever.0.5.0 — October 1, 2026
 
 Integrate official complete-suite v9.3.4, including changes from v9.3.1–9.3.4.

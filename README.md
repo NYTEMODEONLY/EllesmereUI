@@ -87,7 +87,7 @@ not replace every official feature with a second custom implementation.
 | Legacy | Native rewards, challenges and tree integrated with the custom native window presentation. |
 | Spellbook / talents / professions | Ranked spellbook, talent-window fixes, profession overview/cards, First Aid, crafting and pooled recipe details. |
 | Other windows | Forever adapters for Collections, Group Finder, social, Edit Mode, auction and native window geometry/tooltips. |
-| Quest tracker | Native anchors plus local layout, options and taint fixes. |
+| Quest tracker | Native anchors plus local layout, options and taint fixes; yields to Questie's enabled tracker and restores existing EUI preferences when it is disabled. |
 | Data Bars / minimap | Real Forever endpoints for Legacy, Spellbook, Talents and Professions, preserving disabled choices and native capability explanations. |
 
 Native window skins retain their **EUI / Modern / Off** choices where supported.
