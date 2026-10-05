@@ -1,28 +1,22 @@
-## October 4: dedicated CurseForge edition requested; rights review pending
+## October 4: GitHub distribution and the Depot UI page
 
-The owner now requests **EllesmereUI: Grimlight Edition**, a dedicated CurseForge
-full-suite project, continued GitHub publishing and CurseForge download buttons
-in the existing Discord UI channel. This newer direction supersedes the older
-GitHub-only preference, subject to actual redistribution rights and release gates.
+The owner's latest direction keeps https://github.com/NYTEMODEONLY/EllesmereUI
+as the canonical custom project. The proposed separate CurseForge edition is
+shelved; do not migrate source or publish a custom CurseForge project.
 
-The new project repository is https://github.com/NYTEMODEONLY/Grimlight-EllesmereUI .
-It currently contains original preparation documents only. The reviewed upstream
-v9.3.6 and official CurseForge licenses reserve all rights; no redistribution grant
-was found in the maintenance records. The owner has been asked for any existing
-permission. Do not publish new bundled upstream source/assets or full-suite
-packages, migrate source into the new repository, or claim CurseForge availability
-until an applicable permission grant is recorded. Credit alone is not that grant.
-Original documentation maintenance can continue. Do not delete or rewrite existing
-history/releases, or change the installed runtime/saves as part of this preparation.
+The community introduction is https://grimlightdepot.com/ui . Website My UI
+links and Discord UI announcement buttons go there. That page credits Ellesmere /
+EllesmereGaming and links both the original UI and the canonical custom GitHub.
+The README's https://grimlightdepot.com/ui/download link resolves GitHub's
+designated latest stable release to its versioned full-suite ZIP. Never replace
+it with GitHub's generated source archive or a personal installation export.
 
-Read the new repository's docs/REDISTRIBUTION.md and docs/RELEASE_WORKFLOW.md.
-The prepared listing credits Ellesmere / EllesmereGaming, links directly to the
-original CurseForge project, and separates custom support. Preserve licenses,
-version scheme, neutral public profile, all custom behavior and private recovery.
-Once eligible, publish identical reviewed ZIPs on both hosts, verify the exact
-approved CurseForge file and update the existing receipted Discord card in place.
-No CurseForge project/file exists yet; keep the current download link until a real
-replacement is verified. This is a pending distribution transition, not a release.
+Preserve the existing update, review, privacy, rights and live acceptance gates.
+The prior rights review did not record a new redistribution grant; this direction
+does not change upstream licenses. This website/docs task links existing releases
+and does not publish new upstream code/assets. Do not delete release history.
+Read docs/COMMUNITY_RELEASES.md in the canonical GitHub checkout for the complete
+cross-project publication checklist. Installed settings and private seeds stay local.
 
 # Publishing and release maintenance
 

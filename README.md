@@ -1,4 +1,15 @@
-# EllesmereUI Forever — NYTEMODEONLY's custom edition
+# EllesmereUI Forever — Grimlight’s custom edition
+
+**[⬇ Download latest full UI — ZIP](https://grimlightdepot.com/ui/download)**
+
+[Explore the UI & original creator credits](https://grimlightdepot.com/ui) ·
+[Latest release & patch notes](https://github.com/NYTEMODEONLY/EllesmereUI/releases/latest)
+
+The download link selects the complete package from our latest published stable
+GitHub release (checked within two minutes). No GitHub account is needed. If GitHub
+is temporarily unavailable, use the release page above and try again shortly.
+Use this installable ZIP rather than **Code → Download ZIP**, which is a source archive.
+Personal saves, profiles and private diagnostics are not included.
 
 A maintained custom version of [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI)
 for **WoW Forever**, with chat-embedded meters, integrated threat, expanded native
@@ -153,8 +164,9 @@ local; nothing is automatically uploaded. A crash can lose unsaved reports.
 
 ## Install or update
 
-1. Download the **EllesmereUI-9.3.4-forever.0.5.0.zip** release asset (or the matching
-   asset from a later release). GitHub's automatic source archives are developer
+1. [Download the latest full UI ZIP](https://grimlightdepot.com/ui/download), or open
+   [the latest release](https://github.com/NYTEMODEONLY/EllesmereUI/releases/latest)
+   and choose its **EllesmereUI-VERSION.zip** asset. GitHub's automatic source archives are developer
    checkouts, not ready-to-copy AddOns packages.
 2. Back up your current suite and settings. For a complete package replacement,
    close WoW, then extract the ZIP's sibling `EllesmereUI*` folders into the
