@@ -144,3 +144,13 @@ the addon icon. Keep this ownership distinction when changing tray child levels.
 verify-minimap-tray.py reproduces the old bug; all 56 active scripts and Lua 5.1
 compilation pass. Native click/appearance acceptance after reload remains pending.
 This routine source fix does not replace the published 0.6.1 release asset.
+
+
+### Bag Disenchant input
+
+Keep the Disenchant secure overlay parented and anchored only to UIParent so
+bag layout stays unprotected. Explicitly enable its mouse input and consume
+clicks; the visual anchor handles hover only. Preserve native secure OnClick,
+release-only casting and combat hiding. verify-bag-disenchant.py exercises the
+native input dispatcher plus layering, scaling and combat lifecycle. Live
+mouse targeting and item selection require player acceptance.

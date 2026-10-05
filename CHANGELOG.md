@@ -2,6 +2,13 @@
 
 ## Unreleased maintenance — October 5, 2026
 
+Repair bag Disenchant mouse ownership: explicitly enable the independent secure
+click target and stop click propagation; leave the visual anchor hover-only.
+Native spell dispatch, combat hiding, bag movement and saved settings are
+preserved. Expanded regressions exercise native release-click dispatch with both
+key-down settings, layers, scales and lifecycle. All 56 active checks pass;
+player reload, targeting cursor and actual item disenchant remain unverified.
+
 Fix addon icons disappearing after a click in the minimap tray's box mode.
 The popup-raising hook now leaves its own opaque background below the button's
 icon, while still raising addon popup children and respecting protected frames

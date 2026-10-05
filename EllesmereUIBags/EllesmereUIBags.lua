@@ -1049,7 +1049,10 @@ local function CreateDisenchantButton(header, bagsBtn)
     local anchor = CreateFrame("Frame", nil, header)
     anchor:SetSize(24, 24)
     anchor:SetPoint("RIGHT", bagsBtn, "LEFT", -6, 0)
-    anchor:EnableMouse(true)
+    -- Only the secure overlay owns clicks. The visual anchor still provides
+    -- the unavailable-in-combat tooltip while that overlay is hidden.
+    anchor:SetMouseClickEnabled(false)
+    anchor:SetMouseMotionEnabled(true)
     -- Reuse the sort button's gold rim; the circular spell covers its center.
     anchor.rim = anchor:CreateTexture(nil, "BACKGROUND")
     anchor.rim:SetAllPoints()
@@ -1096,6 +1099,8 @@ local function CreateDisenchantButton(header, bagsBtn)
             button = CreateFrame("Button", "EUI_BagDisenchantButton", UIParent,
                 "SecureActionButtonTemplate")
             button:Hide()
+            button:EnableMouse(true)
+            button:SetPropagateMouseClicks(false)
             button:RegisterForClicks("LeftButtonUp")
             button:SetAttribute("useOnKeyDown", false)
             button:SetAttribute("type1", "spell")
