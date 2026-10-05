@@ -143,7 +143,7 @@ The popup click hook excludes its own ungroupBg background so it stays below
 the addon icon. Keep this ownership distinction when changing tray child levels.
 verify-minimap-tray.py reproduces the old bug; all 56 active scripts and Lua 5.1
 compilation pass. Native click/appearance acceptance after reload remains pending.
-This routine source fix does not replace the published 0.6.1 release asset.
+Published with the Disenchant fix in 9.3.6-forever.0.6.2; old assets remain immutable.
 
 
 ### Bag Disenchant input

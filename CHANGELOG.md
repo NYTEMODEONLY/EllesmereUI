@@ -1,6 +1,6 @@
 # Custom release history
 
-## Unreleased maintenance — October 5, 2026
+## 9.3.6-forever.0.6.2 — October 5, 2026
 
 Fix bag Disenchant clicks being intercepted by the raised bag window. The
 independent secure button now participates in top-level hit testing, raises on
@@ -8,7 +8,7 @@ show and recovers on anchor hover; anchor mouse policy is applied after scripts.
 Native release-click spell dispatch, combat hiding and saved settings remain.
 All 56 active checks pass. Live checks confirmed native targeting after raising
 and reopening bags, and Escape cancellation. Automation did not select or destroy an item;
-actual item disenchant and combat acceptance remain untested.
+the owner confirmed the fix after testing. Combat acceptance remains untested.
 
 Fix addon icons disappearing after a click in the minimap tray's box mode.
 The popup-raising hook now leaves its own opaque background below the button's
@@ -16,8 +16,8 @@ icon, while still raising addon popup children and respecting protected frames
 in combat. Settings, placement and addon click actions stay unchanged.
 A Lua 5.1 regression reproduces the old failure and checks repeated clicks,
 popup nesting, hidden backgrounds and protected children. Native acceptance
-after the player's reload remains pending. This is source maintenance after
-9.3.6-forever.0.6.1; the published release ZIP is unchanged.
+after the player's reload remains pending. This full-suite patch retains the
+official 9.3.6 base, neutral public defaults and existing player settings.
 
 ## 9.3.6-forever.0.6.1 — October 4, 2026
 

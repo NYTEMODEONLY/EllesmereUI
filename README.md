@@ -15,7 +15,7 @@ A maintained custom version of [EllesmereUI](https://github.com/EllesmereGaming/
 for **WoW Forever**, with chat-embedded meters, integrated threat, expanded native
 window support, safer bag operations and Forever-specific fixes.
 
-**Current custom baseline: 9.3.6-forever.0.6.1**, based on the official complete-suite
+**Current custom baseline: 9.3.6-forever.0.6.2**, based on the official complete-suite
 [**v9.3.6** release](https://github.com/EllesmereGaming/EllesmereUI/releases/tag/v9.3.6). This is an independently maintained fork, not an official
 EllesmereUI release. The target is Forever's interface **16001** (16000–19999
 client family); this custom distribution is not validated for Retail or other
@@ -24,10 +24,9 @@ Classic clients.
 [Download releases](https://github.com/NYTEMODEONLY/EllesmereUI/releases) ·
 [Custom changelog](CHANGELOG.md) · [Maintenance](docs/MAINTENANCE.md)
 
-Current source also repairs bag Disenchant clicks, with live targeting and
-cancellation verified, and fixes minimap tray icons becoming covered after a
-click. See the unreleased maintenance notes; these changes are not yet in the
-release ZIP. Minimap tray in-game acceptance remains pending.
+This release fixes bag Disenchant clicks and minimap tray icons becoming covered
+after a click. Disenchant targeting and cancellation were verified in-game and
+the owner confirmed the fix. Minimap tray live acceptance remains pending.
 
 ## What differs from official EllesmereUI?
 
