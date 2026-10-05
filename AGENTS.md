@@ -88,3 +88,18 @@ custom Below Health Bar option), embedded DamageMeters Threat, official group
 renderer with optional native fallback, official supported-unit prediction and
 local pet/ToT fallback. Retired badges, seals and competing painters stay retired.
 Preserve unknown/protected-value handling, theme choices and native actions.
+
+## October 5: LFG equipped item-level tooltip candidate
+
+Hovered Forever LFG tooltips now request native last-equipped inspection data
+by the exact listed player name. The added Equipped column preserves native
+names, levels, role icons, actions and tooltip content. Requests are debounced,
+serialized (1.5-second spacing), bounded by a five-second timeout and paused
+for combat/manual inspections. Only matching readable inspection replies are
+accepted; a session-only 60-second cache avoids repeated requests. Missing,
+restricted or refused data stays Unavailable. No distance gate, Inspect-window
+opening, ClearInspectPlayer call, saved player database or gear-score arithmetic.
+Preserve verify-lfg-item-level.py and the existing group-finder appearance tests.
+57 offline checks pass; remote name eligibility, server reply timing, native
+rendering and manual-inspect coexistence still require player /reload acceptance.
+This is source maintenance after 9.3.6-forever.0.6.2; no release asset is replaced.

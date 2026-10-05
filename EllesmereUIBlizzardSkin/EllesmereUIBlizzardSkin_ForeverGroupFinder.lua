@@ -298,3 +298,212 @@ local ApplyWindow = W.WindowCallback(KEY, Apply)
 W.RegisterWindow({ key = KEY, addons = { Blizzard_GroupFinder_VanillaStyle = true }, apply = ApplyWindow })
 W.OnLooksChanged(ApplyWindow)
 ns.ForeverGroupFinder = ApplyWindow
+
+-- Last-equipped inspection for the hovered Forever LFG listing.
+-- Kept separate from decoration: native listing actions and Inspect UI own
+-- their state. No distance/visibility checks, saved player data or gear arithmetic.
+do
+    local cache, rows = {}, {}
+    local tip, baseWidth, pending, timer, hooked, ownRequest
+    local nextRequest = 0
+    local Pump, Paint
+    local function Plain(v) return not (issecretvalue and issecretvalue(v)) end
+    local function Text(v) return Plain(v) and type(v) == "string" and v ~= "" end
+    local function Number(v) return Plain(v) and type(v) == "number" and v == v and v >= 0 and v < math.huge end
+    local function Read(fn, ...)
+        if type(fn) == "function" then return pcall(fn, ...) end
+        return false
+    end
+    local function Shown(frame)
+        if not frame then return false end
+        local ok, value = Read(frame.IsShown, frame)
+        return ok and Plain(value) and value == true
+    end
+    local function ManualInspect()
+        if InspectFrame and (InspectFrame.unit or Shown(InspectFrame)) then return true end
+        local ok, inspecting = Read(PlayerSpellsFrame and PlayerSpellsFrame.IsInspecting, PlayerSpellsFrame)
+        return ok and (not Plain(inspecting) or inspecting == true)
+    end
+    local function CancelTimer()
+        if timer then timer:Cancel(); timer = nil end
+    end
+    local function Schedule(delay)
+        if timer or not Shown(tip) then return end
+        timer = C_Timer.NewTimer(delay, function() timer = nil; Pump() end)
+    end
+    local function Remember(name, text, lifetime)
+        local now, count = GetTime(), 0
+        for key, entry in pairs(cache) do
+            if entry.expires <= now then cache[key] = nil else count = count + 1 end
+        end
+        if count >= 100 then wipe(cache) end
+        cache[name] = { text = text, expires = now + lifetime }
+    end
+    local function Cached(name)
+        local entry = cache[name]
+        return entry and entry.expires > GetTime() and entry.text or nil
+    end
+    Paint = function()
+        if not Shown(tip) then return end
+        local width = baseWidth
+        for _, row in ipairs(rows) do
+            local value = Cached(row.name) or "Loading..."
+            row.label:SetText("Equipped: " .. value)
+            W.Font(row.label, W.Theme.accR, W.Theme.accG, W.Theme.accB)
+            row.label:Show()
+            -- All native role icons retain their anchors and colors. The extra
+            -- column starts after the widest name/level/role lane, including
+            -- hidden role slots, so loading/value transitions never overlap it.
+            width = math.max(width, row.offset + row.label:GetStringWidth() + 40)
+        end
+        tip:SetWidth(width)
+    end
+    local function Finish(text, lifetime)
+        if not pending then return end
+        Remember(pending.name, text, lifetime)
+        pending = nil
+        Paint()
+        Schedule(math.max(.05, nextRequest - GetTime()))
+    end
+    Pump = function()
+        if not Shown(tip) then return end
+        if pending then
+            if GetTime() >= pending.deadline then Finish("Unavailable", 10) else Schedule(.25) end
+            return
+        end
+        if InCombatLockdown() or ManualInspect() then Schedule(.5); return end
+        if GetTime() < nextRequest then Schedule(nextRequest - GetTime()); return end
+        for _, row in ipairs(rows) do
+            if not Cached(row.name) then
+                local ok, allowed = Read(CanInspect, row.name)
+                if not ok or not Plain(allowed) or allowed ~= true
+                    or type(NotifyInspect) ~= "function"
+                    or not C_PaperDollInfo or type(C_PaperDollInfo.GetInspectItemLevel) ~= "function" then
+                    Remember(row.name, "Unavailable", 10)
+                else
+                    local guidOK, guid = Read(UnitGUID, row.name)
+                    pending = { name = row.name, guid = guidOK and Text(guid) and guid or nil,
+                        deadline = GetTime() + 5 }
+                    nextRequest = GetTime() + 1.5
+                    ownRequest = true
+                    local sent = Read(NotifyInspect, row.name)
+                    ownRequest = false
+                    if not sent then Finish("Unavailable", 10) end
+                    Paint()
+                    Schedule(.25)
+                    return
+                end
+            end
+        end
+        Paint()
+    end
+    local function Matches(guid)
+        if not pending or not Text(guid) then return false end
+        if pending.guid then return guid == pending.guid end
+        -- Some remote identities become resolvable only after the reply. Never
+        -- assign the next INSPECT_READY blindly to the current hover.
+        local ok, resolved = Read(UnitGUID, pending.name)
+        if ok and Text(resolved) then return resolved == guid end
+        if not Plain(resolved) then return false end
+        -- A remote reply can carry an identity before a world unit exists.
+        -- Accept only an exact native name/realm match, never a shortened name.
+        local playerOK, _, _, _, _, _, name, realm = Read(GetPlayerInfoByGUID, guid)
+        if not playerOK or not Text(name) or not Plain(realm) or type(realm) ~= "string" then return false end
+        if realm ~= "" and pending.name == name .. "-" .. realm then return true end
+        local realmOK, localRealm = Read(GetNormalizedRealmName)
+        return pending.name == name and (realm == "" or (realmOK and Text(localRealm) and realm == localRealm))
+    end
+    local labels = setmetatable({}, { __mode = "k" })
+    local function OnTooltip(frame, resultID)
+        CancelTimer()
+        for _, label in pairs(labels) do label:Hide() end
+        rows = {}
+        tip, baseWidth = frame, frame:GetWidth()
+        if not Plain(resultID) or not Number(resultID) or not C_LFGList then return end
+        local ok, info = Read(C_LFGList.GetSearchResultInfo, resultID)
+        if not ok or not Plain(info) or type(info) ~= "table"
+            or not Plain(info.isDelisted) or info.isDelisted then return end
+        local count = info.numMembers
+        if not Number(count) or count < 1 then return end
+        local names = {}
+        local function Add(info)
+            if Plain(info) and type(info) == "table" and Text(info.name) then names[info.name] = true end
+        end
+        local leaderOK, leader = Read(C_LFGList.GetSearchResultLeaderInfo, resultID)
+        if leaderOK then Add(leader) end
+        if count <= 10 then
+            for i = 1, count do
+                local memberOK, member = Read(C_LFGList.GetSearchResultPlayerInfo, resultID, i)
+                if memberOK then Add(member) end
+            end
+        end
+        local frames = { frame.Leader }
+        if frame.memberPool then
+            for member in frame.memberPool:EnumerateActive() do frames[#frames + 1] = member end
+        end
+        local offset = 0
+        for _, member in ipairs(frames) do
+            if Shown(member) and member.Name and member.Level then
+                local name = member.Name:GetText()
+                if Text(name) and names[name] then
+                    local lane = member.Name:GetWidth() + member.Level:GetStringWidth() + 82
+                    offset = math.max(offset, lane)
+                    local label = labels[member]
+                    if not label then
+                        label = member:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                        label:SetJustifyH("LEFT")
+                        label:SetWordWrap(false)
+                        labels[member] = label
+                    end
+                    rows[#rows + 1] = { name = name, label = label, frame = member }
+                end
+            end
+        end
+        for _, row in ipairs(rows) do
+            row.offset = offset
+            row.label:ClearAllPoints()
+            row.label:SetPoint("TOPLEFT", row.frame.Name, "TOPLEFT", offset, 0)
+        end
+        Paint()
+        Schedule(.2) -- Skip brief cursor passes; inspect only the hovered listing.
+    end
+    local function Install()
+        if hooked or type(LFGBrowseSearchEntryTooltip_UpdateAndShow) ~= "function"
+            or not LFGBrowseSearchEntryTooltip or not C_Timer or not C_Timer.NewTimer then return end
+        hooked = true
+        hooksecurefunc("LFGBrowseSearchEntryTooltip_UpdateAndShow", OnTooltip)
+        LFGBrowseSearchEntryTooltip:HookScript("OnHide", function()
+            CancelTimer()
+            rows = {}
+            tip = nil
+        end)
+    end
+    local driver = CreateFrame("Frame")
+    driver:RegisterEvent("ADDON_LOADED")
+    driver:RegisterEvent("INSPECT_READY")
+    driver:RegisterEvent("PLAYER_REGEN_ENABLED")
+    driver:SetScript("OnEvent", function(_, event, guid)
+        if event == "ADDON_LOADED" then Install()
+        elseif event == "PLAYER_REGEN_ENABLED" then Schedule(.2)
+        elseif Matches(guid) then
+            local ok, value = Read(C_PaperDollInfo and C_PaperDollInfo.GetInspectItemLevel, pending.name)
+            if ok and Number(value) then Finish(string.format("%.2f", value), 60)
+            else Finish("Unavailable", 10) end
+        end
+    end)
+    -- A manual inspection or another addon's request always takes precedence.
+    -- Never call ClearInspectPlayer or alter InspectFrame.unit/INSPECTED_UNIT.
+    if type(NotifyInspect) == "function" then
+        hooksecurefunc("NotifyInspect", function()
+            if ownRequest then return end
+            pending = nil
+            nextRequest = GetTime() + 5
+            Schedule(5)
+        end)
+    end
+    if type(ClearInspectPlayer) == "function" then
+        hooksecurefunc("ClearInspectPlayer", function() pending = nil; Schedule(.2) end)
+    end
+    W.OnLooksChanged(function() Paint() end)
+    Install()
+end

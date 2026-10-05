@@ -43,7 +43,11 @@ function CreateFrame(kind,name,parent)
     local f=frame(); f.owned=true; f.parent=parent; f.points={}
     function f:SetPoint(point,to,rel,x,y) self.points[point]={to,rel,x,y} end
     function f:SetFrameLevel(l) self.level=l end
-    parent.ownedChildren=parent.ownedChildren or {}; table.insert(parent.ownedChildren,f)
+    function f:RegisterEvent(event) self.events=self.events or {}; self.events[event]=true end
+    function f:SetScript(event,fn) self.hooks[event]=fn end
+    if parent then
+        parent.ownedChildren=parent.ownedChildren or {}; table.insert(parent.ownedChildren,f)
+    end
     return f
 end
 local function pool(...)
@@ -87,7 +91,10 @@ function W.Inset() end
 function W.CloseButton() end
 function W.ScrollBar(f) f.Back.Texture.alpha=0; f.Forward.Texture.alpha=0 end
 function W.RegisterWindow(entry) W.entry=entry end
-function W.OnLooksChanged(fn) W.look=fn end
+function W.OnLooksChanged(fn)
+    local previous=W.look
+    W.look=function() if previous then previous() end; fn() end
+end
 function hooksecurefunc(object,key,fn)
     if type(object)=="string" then fn=key; key=object; object=_G end
     local original=object[key]

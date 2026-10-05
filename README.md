@@ -102,7 +102,7 @@ not replace every official feature with a second custom implementation.
 | Character / Inspect | Custom six-tab shell, collapsible panes, stats styling, item levels inside the icon's upper-right corner, green enchant details/tooltips and gems. Official item-stat/weapon-DPS labels use a separate lane; duplicate shell/enchant painters are suppressed. |
 | Legacy | Native rewards, challenges and tree integrated with the custom native window presentation. |
 | Spellbook / talents / professions | Ranked spellbook, talent-window fixes, profession overview/cards, First Aid, crafting and pooled recipe details. |
-| Other windows | Forever adapters for Collections, Group Finder, social, Edit Mode, auction and native window geometry/tooltips. |
+| Other windows | Forever adapters for Collections, Group Finder, social, Edit Mode, auction and native window geometry/tooltips. Source after 0.6.2 adds LFG Equipped item-level hover data from native inspection; remote lookup/rendering acceptance is pending. |
 | Quest tracker | Native anchors plus local layout, options and taint fixes; yields to Questie's enabled tracker and restores existing EUI preferences when it is disabled. |
 | Data Bars / minimap | Real Forever endpoints for Legacy, Spellbook, Talents and Professions, preserving disabled choices and native capability explanations. |
 

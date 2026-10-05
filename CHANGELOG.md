@@ -1,5 +1,15 @@
 # Custom release history
 
+## Unreleased — October 5, 2026
+
+Add an Equipped column to Forever LFG hover tooltips, requesting native
+last-equipped inspection data with exact reply identity matching, bounded
+requests and a short session cache. Manual inspections retain priority;
+unknown/restricted data is shown as unavailable. No saved settings change.
+57 offline regressions pass. Remote lookup and rendering await player reload
+acceptance; this source change is not in the published 0.6.2 ZIP.
+
+
 ## 9.3.6-forever.0.6.2 — October 5, 2026
 
 Fix bag Disenchant clicks being intercepted by the raised bag window. The
