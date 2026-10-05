@@ -1,5 +1,16 @@
 # Custom release history
 
+## Unreleased maintenance — October 5, 2026
+
+Fix addon icons disappearing after a click in the minimap tray's box mode.
+The popup-raising hook now leaves its own opaque background below the button's
+icon, while still raising addon popup children and respecting protected frames
+in combat. Settings, placement and addon click actions stay unchanged.
+A Lua 5.1 regression reproduces the old failure and checks repeated clicks,
+popup nesting, hidden backgrounds and protected children. Native acceptance
+after the player's reload remains pending. This is source maintenance after
+9.3.6-forever.0.6.1; the published release ZIP is unchanged.
+
 ## 9.3.6-forever.0.6.1 — October 4, 2026
 
 Fix missing bag item tooltips after the 9.3.6 integration. Blizzard's container

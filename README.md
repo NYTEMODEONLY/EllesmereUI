@@ -24,6 +24,9 @@ Classic clients.
 [Download releases](https://github.com/NYTEMODEONLY/EllesmereUI/releases) ·
 [Custom changelog](CHANGELOG.md) · [Maintenance](docs/MAINTENANCE.md)
 
+Current source also fixes minimap tray icons becoming covered after a click.
+See the unreleased maintenance notes; this fix is not yet in the release ZIP.
+
 ## What differs from official EllesmereUI?
 
 This edition keeps the official framework and supported features, then adds the

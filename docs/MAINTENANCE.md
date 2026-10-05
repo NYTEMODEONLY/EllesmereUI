@@ -136,3 +136,11 @@ bank factories. Preserve this relative layer when creating pooled buttons; the
 native template fixes a low absolute level. Run verify-bag-tooltips.py with the
 preserved native fixtures. Normal bag tooltips were player-confirmed after reload;
 comparison/combat behavior still requires native acceptance.
+
+## October 5 minimap tray maintenance
+
+The popup click hook excludes its own ungroupBg background so it stays below
+the addon icon. Keep this ownership distinction when changing tray child levels.
+verify-minimap-tray.py reproduces the old bug; all 56 active scripts and Lua 5.1
+compilation pass. Native click/appearance acceptance after reload remains pending.
+This routine source fix does not replace the published 0.6.1 release asset.
