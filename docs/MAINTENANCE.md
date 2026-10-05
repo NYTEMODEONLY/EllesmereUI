@@ -1,3 +1,29 @@
+## October 4: dedicated CurseForge edition requested; rights review pending
+
+The owner now requests **EllesmereUI: Grimlight Edition**, a dedicated CurseForge
+full-suite project, continued GitHub publishing and CurseForge download buttons
+in the existing Discord UI channel. This newer direction supersedes the older
+GitHub-only preference, subject to actual redistribution rights and release gates.
+
+The new project repository is https://github.com/NYTEMODEONLY/Grimlight-EllesmereUI .
+It currently contains original preparation documents only. The reviewed upstream
+v9.3.6 and official CurseForge licenses reserve all rights; no redistribution grant
+was found in the maintenance records. The owner has been asked for any existing
+permission. Do not publish new bundled upstream source/assets or full-suite
+packages, migrate source into the new repository, or claim CurseForge availability
+until an applicable permission grant is recorded. Credit alone is not that grant.
+Original documentation maintenance can continue. Do not delete or rewrite existing
+history/releases, or change the installed runtime/saves as part of this preparation.
+
+Read the new repository's docs/REDISTRIBUTION.md and docs/RELEASE_WORKFLOW.md.
+The prepared listing credits Ellesmere / EllesmereGaming, links directly to the
+original CurseForge project, and separates custom support. Preserve licenses,
+version scheme, neutral public profile, all custom behavior and private recovery.
+Once eligible, publish identical reviewed ZIPs on both hosts, verify the exact
+approved CurseForge file and update the existing receipted Discord card in place.
+No CurseForge project/file exists yet; keep the current download link until a real
+replacement is verified. This is a pending distribution transition, not a release.
+
 # Publishing and release maintenance
 
 October 1 owner clarification: EUI's GitHub workflow and upstream credits stay
