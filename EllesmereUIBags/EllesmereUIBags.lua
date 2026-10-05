@@ -1049,10 +1049,6 @@ local function CreateDisenchantButton(header, bagsBtn)
     local anchor = CreateFrame("Frame", nil, header)
     anchor:SetSize(24, 24)
     anchor:SetPoint("RIGHT", bagsBtn, "LEFT", -6, 0)
-    -- Only the secure overlay owns clicks. The visual anchor still provides
-    -- the unavailable-in-combat tooltip while that overlay is hidden.
-    anchor:SetMouseClickEnabled(false)
-    anchor:SetMouseMotionEnabled(true)
     -- Reuse the sort button's gold rim; the circular spell covers its center.
     anchor.rim = anchor:CreateTexture(nil, "BACKGROUND")
     anchor.rim:SetAllPoints()
@@ -1068,6 +1064,7 @@ local function CreateDisenchantButton(header, bagsBtn)
     anchor.icon:AddMaskTexture(anchor.mask)
     anchor:SetAlpha(0.9)
 
+    local button, knowsSpell
     local function OnEnter(self)
         anchor:SetAlpha(1)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -1081,10 +1078,19 @@ local function CreateDisenchantButton(header, bagsBtn)
         anchor:SetAlpha(0.9)
         GameTooltip:Hide()
     end
-    anchor:SetScript("OnEnter", OnEnter)
+    anchor:SetScript("OnEnter", function(self)
+        -- Native top-level raising can put the bag tree ahead of this separate
+        -- secure root without changing either frame level. Recover on hover,
+        -- before the hardware click, including after other bag controls raise it.
+        if button and button:IsShown() and not InCombatLockdown() then button:Raise() end
+        OnEnter(self)
+    end)
     anchor:SetScript("OnLeave", OnLeave)
+    -- Set mouse policy after installing scripts, which can enable input.
+    -- Only the secure overlay owns clicks; the anchor retains combat tooltips.
+    anchor:SetMouseMotionEnabled(true)
+    anchor:SetMouseClickEnabled(false)
 
-    local button, knowsSpell
     local lastX, lastY, lastScale
     local function SyncButton()
         if InCombatLockdown() then return end
@@ -1099,6 +1105,9 @@ local function CreateDisenchantButton(header, bagsBtn)
             button = CreateFrame("Button", "EUI_BagDisenchantButton", UIParent,
                 "SecureActionButtonTemplate")
             button:Hide()
+            -- Participate in top-level hit testing alongside the raised bag.
+            -- A higher frame level alone did not receive clicks in Forever.
+            button:SetToplevel(true)
             button:EnableMouse(true)
             button:SetPropagateMouseClicks(false)
             button:RegisterForClicks("LeftButtonUp")
@@ -1127,7 +1136,10 @@ local function CreateDisenchantButton(header, bagsBtn)
         local strata, level = header:GetFrameStrata(), header:GetFrameLevel() + 5
         if button:GetFrameStrata() ~= strata then button:SetFrameStrata(strata) end
         if button:GetFrameLevel() ~= level then button:SetFrameLevel(level) end
-        if not button:IsShown() then button:Show() end
+        if not button:IsShown() then
+            button:Show()
+            button:Raise()
+        end
     end
 
     local function RefreshSpell()

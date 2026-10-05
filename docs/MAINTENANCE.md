@@ -148,9 +148,14 @@ This routine source fix does not replace the published 0.6.1 release asset.
 
 ### Bag Disenchant input
 
-Keep the Disenchant secure overlay parented and anchored only to UIParent so
-bag layout stays unprotected. Explicitly enable its mouse input and consume
-clicks; the visual anchor handles hover only. Preserve native secure OnClick,
-release-only casting and combat hiding. verify-bag-disenchant.py exercises the
-native input dispatcher plus layering, scaling and combat lifecycle. Live
-mouse targeting and item selection require player acceptance.
+Keep the secure overlay parented and anchored only to UIParent so bag layout
+stays unprotected. Explicitly enable mouse input and consume clicks. Set the
+visual anchor's hover-only mouse policy after installing scripts. The secure
+target is top-level, raises on show and recovers on anchor hover when bag raising
+changes hit order. Never raise in combat or continuously during idle updates.
+Preserve native secure OnClick, release-only casting and combat hiding.
+verify-bag-disenchant.py exercises the native dispatcher, script-enabled input,
+raising/reopening, hover recovery, scaling and combat lifecycle. All 56 checks
+pass. Authorized live checks on build 1.60.1.70205 verified targeting after bag
+raising and reopening, and Escape cancellation. Automation did not select or destroy an item;
+actual item disenchant and combat remain untested. Do not publish temporary probes.

@@ -24,9 +24,10 @@ Classic clients.
 [Download releases](https://github.com/NYTEMODEONLY/EllesmereUI/releases) ·
 [Custom changelog](CHANGELOG.md) · [Maintenance](docs/MAINTENANCE.md)
 
-Current source also repairs bag Disenchant mouse handling and fixes minimap tray
-icons becoming covered after a click. See the unreleased maintenance notes; these
-changes are not yet in the release ZIP and still need in-game acceptance.
+Current source also repairs bag Disenchant clicks, with live targeting and
+cancellation verified, and fixes minimap tray icons becoming covered after a
+click. See the unreleased maintenance notes; these changes are not yet in the
+release ZIP. Minimap tray in-game acceptance remains pending.
 
 ## What differs from official EllesmereUI?
 

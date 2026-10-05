@@ -2,12 +2,13 @@
 
 ## Unreleased maintenance — October 5, 2026
 
-Repair bag Disenchant mouse ownership: explicitly enable the independent secure
-click target and stop click propagation; leave the visual anchor hover-only.
-Native spell dispatch, combat hiding, bag movement and saved settings are
-preserved. Expanded regressions exercise native release-click dispatch with both
-key-down settings, layers, scales and lifecycle. All 56 active checks pass;
-player reload, targeting cursor and actual item disenchant remain unverified.
+Fix bag Disenchant clicks being intercepted by the raised bag window. The
+independent secure button now participates in top-level hit testing, raises on
+show and recovers on anchor hover; anchor mouse policy is applied after scripts.
+Native release-click spell dispatch, combat hiding and saved settings remain.
+All 56 active checks pass. Live checks confirmed native targeting after raising
+and reopening bags, and Escape cancellation. Automation did not select or destroy an item;
+actual item disenchant and combat acceptance remain untested.
 
 Fix addon icons disappearing after a click in the minimap tray's box mode.
 The popup-raising hook now leaves its own opaque background below the button's

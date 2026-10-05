@@ -25,7 +25,11 @@ local methods = {}
 local function check(self)
     assert(not (self.protected and combat and not secureExecution), "protected write during combat")
 end
-function methods:SetScript(k, v) self.scripts[k] = v end
+function methods:SetScript(k, v)
+    self.scripts[k] = v
+    -- Model native mouse-script installation enabling input.
+    if k == "OnEnter" or k == "OnLeave" then self.mouseClick,self.mouseMotion = true,true end
+end
 function methods:Hide()
     check(self)
     local wasShown = self.shown
@@ -57,6 +61,8 @@ function methods:SetFrameLevel(v) check(self); self.level = v end
 function methods:GetFrameStrata() return self.strata or "HIGH" end
 function methods:SetFrameStrata(v) check(self); self.strata = v end
 function methods:RegisterForClicks(...) check(self); self.clicks = {...} end
+function methods:SetToplevel(v) check(self); self.toplevel=v end
+function methods:Raise() check(self); self.raises=(self.raises or 0)+1 end
 function methods:EnableMouse(v) check(self); self.mouseClick,self.mouseMotion=v,v end
 function methods:SetMouseClickEnabled(v) check(self); self.mouseClick=v end
 function methods:SetMouseMotionEnabled(v) check(self); self.mouseMotion=v end
@@ -107,6 +113,7 @@ local anchor = frames[anchorIndex]
 local button = EUI_Bags._disenchantBtn
 assert(anchor.point[2] == bagsBtn and anchor.point[3] == "LEFT")
 assert(button:IsShown() and button.parent == UIParent)
+assert(button.toplevel and button.raises == 1, "independent secure target must join top-level hit testing and raise on show")
 assert(button.point[2] == UIParent and button.attrs.type1 == "spell" and button.attrs.spell1 == 13262)
 assert(button.clicks[1] == "LeftButtonUp" and button.attrs.useOnKeyDown == false)
 assert(button.mouseClick and button.mouseMotion, "secure target must explicitly receive mouse input")
@@ -121,8 +128,12 @@ for _, strata in ipairs({"MEDIUM", "HIGH"}) do
         assert(button.strata == strata and button.level > header.level + 1)
     end
 end
-local moves = button.moves
+local beforeHover = button.raises
+anchor.scripts.OnEnter(anchor)
+assert(button.raises == beforeHover + 1, "hover must recover the secure target after native bag-tree raising")
+local moves, raises = button.moves, button.raises
 anchor.scripts.OnUpdate()
+assert(button.raises == raises, "stationary bags must not repeatedly raise the target")
 assert(button.moves == moves, "stationary bags should not rewrite geometry")
 anchor.x,anchor.y,anchor.scale = 500,250,0.8
 anchor.scripts.OnUpdate()
@@ -136,12 +147,15 @@ anchor.scripts.OnUpdate()
 EUI_Bags:Hide(); anchor.scripts.OnHide()
 assert(not button:IsShown())
 EUI_Bags:Show(); anchor.scripts.OnShow()
-assert(button:IsShown())
+assert(button:IsShown() and button.raises == raises + 1, "reopening bags must raise the secure target")
 combat = true
 -- Run Blizzard's state driver, including its special visibility path.
 TickStateDrivers()
 anchor.scripts.OnEvent(); anchor.scripts.OnUpdate()
 assert(not button:IsShown() and anchor.icon.desaturated)
+local combatRaises = button.raises
+anchor.scripts.OnEnter(anchor)
+assert(button.raises == combatRaises, "combat tooltip cannot raise a protected frame")
 EUI_Bags:Hide(); anchor.scripts.OnHide()
 EUI_Bags:Show(); anchor.scripts.OnShow(); EUI_Bags:Hide()
 combat = false; TickStateDrivers(); anchor.scripts.OnEvent()
