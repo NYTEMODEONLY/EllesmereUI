@@ -202,6 +202,9 @@ function ns.CreateListRow(host)
     if InCombatLockdown() then return nil end
     local slotParent = CreateFrame("Frame", nil, host)
     local btn = CreateFrame("ItemButton", nil, slotParent, "ContainerFrameItemButtonTemplate")
+    -- The native template fixes level 10, below a raised bag window. Keep
+    -- native item hover/click handlers above the background and drop catcher.
+    btn:SetFrameLevel(slotParent:GetFrameLevel() + 1)
     btn:SetAllPoints(slotParent)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btn:RegisterForDrag("LeftButton")

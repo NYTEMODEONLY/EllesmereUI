@@ -70,6 +70,9 @@ local function GetOrCreateSlot(idx)
     local slotParent = CreateFrame("Frame", nil, EUI_Bags)
     slotParent:SetSize(SLOT_SIZE, SLOT_SIZE)
     local btn = CreateFrame("ItemButton", nil, slotParent, "ContainerFrameItemButtonTemplate")
+    -- The native template fixes level 10, below a raised bag window. Keep
+    -- native item hover/click handlers above the background and drop catcher.
+    btn:SetFrameLevel(slotParent:GetFrameLevel() + 1)
     btn:SetAllPoints(slotParent)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btn:RegisterForDrag("LeftButton")

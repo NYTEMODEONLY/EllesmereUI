@@ -4,7 +4,7 @@ A maintained custom version of [EllesmereUI](https://github.com/EllesmereGaming/
 for **WoW Forever**, with chat-embedded meters, integrated threat, expanded native
 window support, safer bag operations and Forever-specific fixes.
 
-**Current custom baseline: 9.3.6-forever.0.6.0**, based on the official complete-suite
+**Current custom baseline: 9.3.6-forever.0.6.1**, based on the official complete-suite
 [**v9.3.6** release](https://github.com/EllesmereGaming/EllesmereUI/releases/tag/v9.3.6). This is an independently maintained fork, not an official
 EllesmereUI release. The target is Forever's interface **16001** (16000–19999
 client family); this custom distribution is not validated for Retail or other

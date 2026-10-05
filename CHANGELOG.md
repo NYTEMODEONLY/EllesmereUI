@@ -1,5 +1,22 @@
 # Custom release history
 
+## 9.3.6-forever.0.6.1 — October 4, 2026
+
+Fix missing bag item tooltips after the 9.3.6 integration. Blizzard's container
+button template assigns an absolute frame level that can sit below the raised
+bag window. New background hover handling then intercepts item mouseovers.
+Grid, list, detached reagent and upstream bank slot factories now put each item
+button one level above its parent, keeping native tooltip and item actions.
+Saved settings, bag positions, inventory data and tooltip preferences are unchanged.
+
+55 active regressions pass. A new test reproduces the old layer ordering and
+executes all four production factories with native tooltip methods, checking
+real slot changes, parent/window raises, native scripts and existing combat
+creation guards. The player confirmed normal bag item tooltips work after reload.
+Native comparison/combat behavior remains unverified. Upstream base stays v9.3.6;
+the previous custom features and privacy omissions remain in place.
+
+
 ## 9.3.6-forever.0.6.0 — October 4, 2026
 
 Integrate the official complete-suite v9.3.6 release, including v9.3.5 and the

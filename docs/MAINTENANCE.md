@@ -100,7 +100,7 @@ timing or actual saved-data persistence. Preserve those as live acceptance items
 
 ## v9.3.6 maintenance
 
-Read UPSTREAM_9.3.6.md for the current integration. There are 54 active checks.
+Read UPSTREAM_9.3.6.md for the current integration. There are 55 active checks.
 Options/runtime splits relocate unit prediction refresh to EUI_UnitFrames_Reload
 and missing-buff defaults to RaidFrames_Options/VisualIndicators_Options.lua.
 All official group parts, including Preview, stand down in native fallback mode.
@@ -109,3 +109,10 @@ takeoff/recovery and explicit false behavior. Grimlight Meters v0.4.1 uses publi
 RegisterPlugin/OpenPlugin; never mutate the current host's core module registry.
 The old-host fallback remains covered by the companion test suite. New official
 skins do not silently take ownership of custom native windows or bar artwork.
+
+The 9.3.6-forever.0.6.1 bag tooltip patch keeps native container item buttons
+one frame level above their wrappers in grid, list, detached reagent and upstream
+bank factories. Preserve this relative layer when creating pooled buttons; the
+native template fixes a low absolute level. Run verify-bag-tooltips.py with the
+preserved native fixtures. Normal bag tooltips were player-confirmed after reload;
+comparison/combat behavior still requires native acceptance.
