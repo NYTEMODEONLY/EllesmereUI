@@ -29,14 +29,12 @@ function EllesmereUI:RegisterModule(_,v) registered=v end
 function EllesmereUI:InvalidatePageCache() end
 """)
 lua.execute(opt)
-lua.execute("assert(#registered.pages==1 and registered.pages[1]=='Travel');assert(registered.buildPage('Threat',{},0)==nil); registered.onReset();assert(EllesmereUIDB.threatMeter.enabled and EllesmereUIDB.unlockAnchors.EUI_ThreatMeter.x==3);EllesmereUI._ModuleNS.EllesmereUIDamageMeters=nil")
-lua.execute(opt);lua.execute("assert(#registered.pages==2 and registered.pages[2]=='Threat')")
+lua.execute("assert(#registered.pages==2 and registered.pages[1]=='Travel' and registered.pages[2]=='Loot');assert(registered.buildPage('Threat',{},0)==nil); registered.onReset();assert(EllesmereUIDB.threatMeter.enabled and EllesmereUIDB.unlockAnchors.EUI_ThreatMeter.x==3);EllesmereUI._ModuleNS.EllesmereUIDamageMeters=nil")
+lua.execute(opt);lua.execute("assert(#registered.pages==3 and registered.pages[2]=='Threat' and registered.pages[3]=='Loot')")
 style=source('EllesmereUIOptions/EUI_Style_Options.lua')
 start=style.index('if EllesmereUI.IS_FOREVER and not (EllesmereUI.ForeverEmbeddedThreatOwnsDisplay')
 end=style.index('Register("questtracker"',start)
 lua.execute("EllesmereUI.IS_FOREVER=true;EllesmereUI._ModuleNS.EllesmereUIDamageMeters={Threat={}}; function Register() error('duplicate style row') end")
 lua.execute(style[start:end])
-start=style.index('-- The custom six-tab shell');end=style.index('if not EllesmereUI.IS_FOREVER then',start)
-lua.execute("IS_FOREVER=true;function NS() return {ForeverOfficialCharacterStats=true} end")
-lua.execute(style[start:end])
+assert 'Register("charsheet"' not in style, 'upstream removed the ineffective style row; do not restore it'
 print('PASS: runtime owner gate independent of module file order, no standalone boot/window/unlock/command, settings/style suppression, dormant data and disabled-module fallback')

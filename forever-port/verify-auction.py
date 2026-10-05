@@ -113,7 +113,7 @@ AuctionHouseSortOrderState={PrimarySorted=1,PrimaryReversed=2,Unsorted=3}
 # Use the real engine fading/edit-box implementation, so these regressions
 # would catch loss of semantic texture alpha instead of mocking it away.
 lua.execute(between(engine, "local function FadeTextures(keep, ...)", "--  Style-aware window shell.")
-            + between(engine, "function WSkin.EditBox(eb)", "-- Checkbox ->")
+            + between(engine, "function WSkin.EditBox(eb, opts)", "-- Checkbox ->")
             + between(engine, "function WSkin.ScrollBar(sb, keepSteppers)", "-- Close (X) button"))
 lua.execute(money_native)
 lua.execute(between(bid_money, "function MoneyInputFrame_SetEnabled", "function MoneyInputFrame_OnTextChanged"))

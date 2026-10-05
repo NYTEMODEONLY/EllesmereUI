@@ -1,5 +1,5 @@
--- Extend only the already-registered Damage Meters page. This runtime override
--- is reapplied when the load-on-demand options addon registers the real page.
+-- Current EUI exposes companion settings through its public plugin API.
+-- Older hosts retain their existing Damage Meters page integration.
 local A = EllesmereUIChatMeters
 local MODULE, PAGE = "EllesmereUIDamageMeters", "Damage Meters"
 local installed = setmetatable({}, { __mode = "k" })
@@ -34,6 +34,21 @@ end
 
 function A:IntegrateOptions()
     local e = EllesmereUI
+    if e and e.RegisterPlugin then
+        if self.optionsPluginRegistered then return true end
+        self.optionsPluginRegistered = e.RegisterPlugin("EllesmereUIChatMeters", {
+            label = "Grimlight Meters",
+            modules = {{
+                key = "ChatEmbedding", title = "Chat Embedding",
+                description = "Choose how your meter windows appear inside chat.",
+                pages = { "Embedding" },
+                buildPage = function(_, parent, yOffset)
+                    return math.abs(A:BuildIntegratedOptions(parent, yOffset or 0))
+                end,
+            }},
+        }) == true
+        return self.optionsPluginRegistered
+    end
     local config = e and e._modules and e._modules[MODULE]
     if not config or type(config.buildPage) ~= "function" then return false end
     if installed[config] then return true end
@@ -61,6 +76,14 @@ end
 local fallbackOpen = A.OpenOptions
 function A:OpenOptions()
     local e = EllesmereUI
+    if e and e.RegisterPlugin and e.OpenPlugin then
+        if self:IntegrateOptions() then
+            e.OpenPlugin("EllesmereUIChatMeters", "ChatEmbedding", "Embedding")
+        else
+            fallbackOpen(self)
+        end
+        return
+    end
     if not (e and e.ShowModule and e.SelectPage and e.GetActiveModule) then return fallbackOpen(self) end
     if self.optionsOpenTicker then self.optionsOpenTicker:Cancel(); self.optionsOpenTicker = nil end
     -- ShowModule supplies the suite's normal combat-lockdown message.

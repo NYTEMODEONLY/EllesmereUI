@@ -203,7 +203,9 @@ for name, test in CASES.items():
     lua = LuaRuntime(unpack_returned_tuples=True)
     try:
         lua.execute(SETUP)
-        lua.execute(SOURCE)
+        lua.execute("ns={}; EllesmereUI._ModuleNS={}; EllesmereUI.Lite={NewAddon=function() return {} end}")
+        lua.execute((ROOT / "EllesmereUIForeverEssentials/EllesmereUIForeverEssentials.lua").read_text(encoding="utf-8-sig"), "EllesmereUIForeverEssentials", lua.globals().ns)
+        lua.execute(SOURCE, "EllesmereUIForeverEssentials", lua.globals().ns)
         lua.execute("Fire('PLAYER_LOGIN')")
         lua.execute(test)
         print('PASS:', name)

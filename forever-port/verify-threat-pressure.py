@@ -28,7 +28,7 @@ lua.execute(handoff,'Nameplates',lua.globals().ns)
 lua.execute("assert(on.threatPctEnabled==false); assert(next(SlashCmdList)==nil and next(ns.defaults)==nil)")
 print('PASS: one-time handoff, explicit false/layout preservation, later OFF, no badge allocations/hooks/timers/commands')
 main=source('EllesmereUINameplates/EllesmereUINameplates.lua')
-options=source('EllesmereUIOptions/EUI_Nameplates_Options.lua')
+options=source('EllesmereUIOptions/EUI_Nameplates_Options.lua')+'\n'+source('EllesmereUIOptions/Nameplates_Options/ColorsPage_Options.lua')
 assert 'ThreatPressure' not in main and 'BuildThreatPressureOptions' not in options
 assert options.count('text="Show Threat % on Nameplates"')==1
 start=main.index('ns._npTptOn = false')

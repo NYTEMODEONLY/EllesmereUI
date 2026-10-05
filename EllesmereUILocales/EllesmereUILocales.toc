@@ -4,7 +4,7 @@
 ## Group: EllesmereUI
 ## Notes: EllesmereUI community translations. Loads on demand for non-English locales.
 ## Author: Ellesmere
-## Version: 9.3.4-forever.0.5.0
+## Version: 9.3.6-forever.0.6.0
 ## Dependencies: EllesmereUI
 ## LoadOnDemand: 1
 ## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga

@@ -85,7 +85,7 @@ flush(); assert(passes==2 and nativeUpdates==2)
 combat=true; UpdateMicroButtons(); flush(); assert(passes==2)
 ''')
 print('PASS: upstream non-Forever registration, forbidden-frame skip, combat deferral and debounce')
-action_options=(ROOT/'EllesmereUIOptions/EUI_ActionBars_Options.lua').read_text(encoding='utf-8')
+action_options=(ROOT/'EllesmereUIOptions/ActionBars_Options/MenuBagsRepPage_Options.lua').read_text(encoding='utf-8')
 assert 'VisOpts("MicroBar", "Micro Menu Visibility")' in action_options
 assert 'VisOpts("BagBar", "Bag Bar Visibility")' in action_options
 for build in ('70009','70010'):

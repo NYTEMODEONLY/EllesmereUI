@@ -121,7 +121,10 @@ local function RewardTrack(page)
     Progress(page.LegacyRewardProgressBar, page.ProgressBarBackground)
     local progress = page.LegacyRewardProgressFrame
     if progress and progress.GetElements then
-        for _, card in ipairs(progress:GetElements()) do RewardCard(card) end
+        local cards = progress:GetElements()
+        if type(cards) == "table" then
+            for _, card in ipairs(cards) do RewardCard(card) end
+        end
         -- Preserve native arrow glyphs and their disabled/hidden state.
         for _, key in ipairs({ "LeftButton", "RightButton", "JumpLeftButton", "JumpRightButton" }) do
             local button = progress[key]

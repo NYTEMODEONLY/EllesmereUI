@@ -34,6 +34,7 @@ lua=fixture['lua']
 lua.execute('''
 style='eui'; combat=false; EllesmereUIDB={}
 EllesmereUI.IS_FOREVER=true
+EllesmereUI.BlizzSkinPadStandDown=function() return false end
 EllesmereUI.L=function(s) return s end
 EllesmereUI.PrimeFontShadow=function() end
 EllesmereUI.GetEnchantText=function() error('duplicate official enchant reader') end

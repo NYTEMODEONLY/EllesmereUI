@@ -157,6 +157,11 @@ LegacySystemFrame = {
 }
 function VerifyLegacy()
     local fill, click = reward.LegacyRewardProgressBar.fill, row.OnClick
+    local progress = reward.LegacyRewardProgressFrame
+    local getElements = progress.GetElements
+    progress.GetElements = function() return nil end
+    NS.ForeverLegacy() -- native initial load, cards not created yet
+    progress.GetElements = getElements
     NS.ForeverLegacy(); NS.ForeverLegacy()
     assert(row.OnClick == click and row.Icon.texture.alpha == 1, "challenge native handler/icon changed")
     assert(tab.Icon.alpha == 1 and not tab.SelectedTexture.shown, "side-tab icon/selection changed")

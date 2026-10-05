@@ -4,8 +4,8 @@ A maintained custom version of [EllesmereUI](https://github.com/EllesmereGaming/
 for **WoW Forever**, with chat-embedded meters, integrated threat, expanded native
 window support, safer bag operations and Forever-specific fixes.
 
-**Current custom baseline: 9.3.4-forever.0.5.0**, based on the official complete-suite
-[**v9.3.4** release](https://github.com/EllesmereGaming/EllesmereUI/releases/tag/v9.3.4). This is an independently maintained fork, not an official
+**Current custom baseline: 9.3.6-forever.0.6.0**, based on the official complete-suite
+[**v9.3.6** release](https://github.com/EllesmereGaming/EllesmereUI/releases/tag/v9.3.6). This is an independently maintained fork, not an official
 EllesmereUI release. The target is Forever's interface **16001** (16000–19999
 client family); this custom distribution is not validated for Retail or other
 Classic clients.
@@ -26,7 +26,8 @@ not replace every official feature with a second custom implementation.
   Damage, healing, Threat and other supported modes use the real meter frames.
 - **Persistent selection and automation:** the selected Chat/Meters view is saved
   per character. Optional instance-entry selection and return-to-chat on exit are
-  available through **Damage Meters → Chat Meters (Custom)** or `/eumeters`.
+  available through **Grimlight Meters → Chat Embedding** or `/eumeters`. Earlier hosts
+  retain the Damage Meters page integration.
 - **Grimlight Meters artwork:** the addon-list icon and existing sidebar slot use
   AI-generated fantasy artwork with ascending crystal meter columns. The host
   still owns sidebar tint, sizing and behavior; native visual acceptance is pending.

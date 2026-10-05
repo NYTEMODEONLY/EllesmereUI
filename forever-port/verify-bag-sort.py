@@ -456,7 +456,8 @@ function Button()
         icon={SetAlpha=function(self,alpha) self.alpha=alpha end}}
 end
 sort=Button()
-EUI_Bags={_diceBtn=Button(), RefreshInventory=function(self) self.refreshed=true end}
+EUI_Bags={_diceBtn=Button(), RefreshInventory=function(self) self.refreshed=true end,
+    HookScript=function(self,event,fn) self[event]=fn end}
 EUI_BagsReagent={IsVisible=function() return false end}
 UIErrorsFrame={AddMessage=function(self,text) self.message=text end}
 EUI_CategoryManager={

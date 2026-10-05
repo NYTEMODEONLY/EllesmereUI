@@ -30,7 +30,7 @@ end }
 ''')
 compile_lua = lua.eval('function(s) local f,e=loadstring(s); assert(f,e) end')
 compile_lua(source)
-merge = re.search(r'local function MergeDuplicates\(items\).*?\nend\n', source, re.S).group()
+merge = re.search(r'local function MergeDuplicates\(items, force\).*?\nend\n', source, re.S).group()
 lua.execute(merge + '\nMergeForTest = MergeDuplicates')
 handler = re.search(r'function ContainerFrameItemButtonMixin:OnModifiedClick\(button\).*?\nend\n', native, re.S).group()
 lua.execute(handler)

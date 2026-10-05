@@ -54,7 +54,9 @@ function CreateFrame()
  return f
 end
 ''')
-prefix=flight[:flight.index('local function ApplyPosition()')]
+lua.execute("module={}; EllesmereUI._ModuleNS={}; EllesmereUI.Lite={NewAddon=function() return {} end}")
+lua.execute(source('EllesmereUIForeverEssentials/EllesmereUIForeverEssentials.lua'), 'EllesmereUIForeverEssentials', lua.globals().module)
+prefix=flight[:flight.index('local function StyleFont(')].replace('local _, module = ...', 'local module = module')
 logic=flight[flight.index('local function EndFlight()'):flight.index('-- Options-page entry points.')]
 lua.execute(prefix+'''
 local function CreateBar()

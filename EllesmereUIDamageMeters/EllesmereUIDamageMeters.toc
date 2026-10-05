@@ -4,7 +4,7 @@
 ## Group: EllesmereUI
 ## Notes: Lightweight damage meters with simple but powerful customization.
 ## Author: Ellesmere
-## Version: 9.3.4-forever.0.5.0
+## Version: 9.3.6-forever.0.6.0
 ## Dependencies: EllesmereUI
 ## SavedVariables: EllesmereUIDamageMetersDB
 ## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga

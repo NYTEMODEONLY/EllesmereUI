@@ -96,3 +96,16 @@ Public code/assets are the custom implementation, not the owner's exported layou
 
 No offline test establishes game rendering, combat security, taint freedom, taxi
 timing or actual saved-data persistence. Preserve those as live acceptance items.
+
+
+## v9.3.6 maintenance
+
+Read UPSTREAM_9.3.6.md for the current integration. There are 54 active checks.
+Options/runtime splits relocate unit prediction refresh to EUI_UnitFrames_Reload
+and missing-buff defaults to RaidFrames_Options/VisualIndicators_Options.lua.
+All official group parts, including Preview, stand down in native fallback mode.
+The shared Essentials Feature kit loads before Travel/Loot. Keep bounded flight
+takeoff/recovery and explicit false behavior. Grimlight Meters v0.4.1 uses public
+RegisterPlugin/OpenPlugin; never mutate the current host's core module registry.
+The old-host fallback remains covered by the companion test suite. New official
+skins do not silently take ownership of custom native windows or bar artwork.

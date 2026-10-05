@@ -1,6 +1,35 @@
 # Custom release history
 
-## Unreleased maintenance — October 2, 2026
+## 9.3.6-forever.0.6.0 — October 4, 2026
+
+Integrate the official complete-suite v9.3.6 release, including v9.3.5 and the
+v9.3.6 HoverCast / Dynamic Rez hotfix.
+
+- Add the official XP overhaul, bag List View and resizing, debuff colors,
+  optional Loot Feed/Self Combat Text, moved chat-bubble controls, DataBars icons
+  and ordering, resource/absorb/portrait controls, plus compatible fixes.
+- Update Grimlight Meters Tab to v0.4.1. Its four embedding controls use the
+  supported plugin API under Grimlight Meters > Chat Embedding. Preserve older
+  host support, saved views, per-character settings and actual embedded windows.
+- Preserve confirmed bag transactions, native bank/sheet/LFG/Legacy owners,
+  native bar artwork, embedded Threat/reports and unsupported-system exclusions.
+  Upstream reconstructed bank List View stays inactive on Forever's native bank.
+- Keep existing visual defaults: Important nameplate buffs, target-and-focus
+  threat when enabled, bags above other windows and no equipped-item border.
+  New controls stay available; explicit saved choices remain authoritative.
+- Relocate custom prediction/missing-buff hooks across upstream file splits.
+  Retain flight takeoff/recovery fixes and Questie tracker priority.
+- Fix Legacy skin startup when the native reward-card list is not created yet.
+
+54 active regression scripts, Lua 5.1 compilation, manifest references and
+disposable updater/rollback checks pass. Public ZIP/profile omission checks are
+separate from the private suite. Native rendering, combat/taint, real flights and
+persistence still require player acceptance. The independently owned companion's
+first CurseForge release remains gated on native/provenance/project requirements.
+See [the integration audit](docs/UPSTREAM_9.3.6.md).
+
+
+## October 2, 2026 maintenance — included in 9.3.6-forever.0.6.0
 
 - Give Questie's enabled tracker priority over the EUI quest tracker. Suppress
   native tracker presentation, click sinks and EUI chrome while Questie owns

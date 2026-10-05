@@ -42,7 +42,7 @@ function makebar()
  return b
 end
 healthBar=makebar(); primaryBar=makebar()
-ns={CfgGen=1,EASE='easing',PPC={gen=1,pp=powerCfg,primary=0}}
+ns={CfgGen=1,EASE='easing',PPC={gen=1,pp=powerCfg,primary=0},PowTracks=function() return false end}
 function CreateColor(r,g,b,a) return {r=r,g=g,b=b,a=a} end
 C_CurveUtil={CreateColorCurve=function()
  local c={points={}}

@@ -48,11 +48,11 @@ assert 'manaRegenSpark = false' in uf
 sheet=source('EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_CharacterSheetForever.lua')
 assert 'not ns.ForeverOfficialCharacterStats and ns.CharSheetForever()' in sheet
 skin=source('EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin.lua')
-adopt=skin[skin.index('local function AdoptForeverCharSheetStyle'):skin.index('local seedFrame',skin.index('local function AdoptForeverCharSheetStyle'))]
+adopt=skin[skin.index('local function AdoptCharSheetCardStyle'):skin.index('local seedFrame',skin.index('local function AdoptCharSheetCardStyle'))]
 lua.execute('EUI_FOREVER=true; EllesmereUI={IS_FOREVER=true}')
-fn=lua.execute(adopt+'\nreturn AdoptForeverCharSheetStyle')
+fn=lua.execute(adopt+'\nreturn AdoptCharSheetCardStyle')
 db=lua.table_from({'profiles':lua.table_from({'existing':lua.table_from({'windowSkinLook':'blizzard'})})})
-fn(db);assert db.foreverCharSheetStyleAdopted is None and db.profiles.existing.charSheetUseBlizzardStyle is None
+fn(db);assert db.charSheetCardStyleAdopted is None and db.profiles.existing.charSheetUseBlizzardStyle is None
 print('PASS: existing custom character owner survives stock-style migration; new spark/reminder/layout load contracts retained')
 meter=source('EllesmereUIDamageMeters/EllesmereUIDamageMeters.lua')
 assert 'local maxAmt = isThreat and 100 or' in meter
